@@ -32,7 +32,7 @@ T = TypeVar("T")
 M = TypeVar("M", bound=BaseModel)
 
 
-async def get_url_model(
+async def get_model(
     session: ClientSession, url: str, resp_model: type[M], retries: int = MAX_RETRIES
 ) -> Optional[M]:
     """Get JSON from URL and return object. Validate JSON against resp_model, if given."""
