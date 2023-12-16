@@ -12,10 +12,18 @@ import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
 
-from pyutils import JSONExportable, export_json, export, Idx
-from pyutils import CSVExportable, export_csv
-from pyutils import TXTExportable, TXTImportable, Importable
-from pyutils import awrap, EventCounter
+from pydantic_exportables import (
+    JSONExportable,
+    export_json,
+    export,
+    Idx,
+    CSVExportable,
+    export_csv,
+    TXTExportable,
+    TXTImportable,
+    Importable,
+)
+from pyutils import awrap
 from pyutils.utils import get_type, get_subtype
 
 

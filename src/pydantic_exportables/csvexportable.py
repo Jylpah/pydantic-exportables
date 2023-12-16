@@ -5,7 +5,7 @@
 ########################################################
 
 import logging
-from typing import cast, Type, Any, Self, AsyncGenerator, Callable, Self, ClassVar
+from typing import Type, Any, Self, AsyncGenerator, Callable, Self, ClassVar
 from collections.abc import MutableMapping
 from pydantic import BaseModel, ValidationError, ConfigDict
 from aiocsv.readers import AsyncDictReader
@@ -15,7 +15,6 @@ from aiofiles import open
 from enum import Enum
 from pathlib import Path
 
-from .utils import str2path
 
 # Setup logging
 logger = logging.getLogger()

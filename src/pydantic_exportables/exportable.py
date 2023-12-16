@@ -18,10 +18,10 @@ from csv import Dialect, excel, QUOTE_NONNUMERIC
 from bson.objectid import ObjectId
 from abc import abstractmethod
 
-from .eventcounter import EventCounter
+from pyutils.eventcounter import EventCounter
 from .jsonexportable import JSONExportable
 from .csvexportable import CSVExportable
-from .utils import str2path
+from pyutils.utils import str2path
 
 # Setup logging
 logger = logging.getLogger()

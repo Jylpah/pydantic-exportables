@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, Iterable, TypeVar, Generic
+from typing import Iterable, TypeVar
 import logging
 
 logger = logging.getLogger()
@@ -12,7 +12,7 @@ T = TypeVar("T")
 
 
 class AliasMapper:
-    """Simple class to map Pydantic BaseModel fields to their aliases"""
+    """Simple class to map Pydantic BaseModel's fields to their aliases"""
 
     def __init__(self, model: type[BaseModel]):
         assert issubclass(
