@@ -71,7 +71,7 @@ include = '\.pyi?$'
 minversion = "7.0"
 addopts = "-v --cov=src"
 filterwarnings = [
-    #    'ignore:Inheritance class ThrottledClientSession from ClientSession is discouraged:DeprecationWarning',
+    'ignore:Inheritance class ThrottledClientSession from ClientSession is discouraged:DeprecationWarning',
 ]
 
 
