@@ -7,7 +7,7 @@
 import logging
 from typing import cast, Type, Any, Self, AsyncGenerator, Callable, Self, ClassVar
 from collections.abc import MutableMapping
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, ConfigDict
 from aiocsv.readers import AsyncDictReader
 from csv import Dialect, excel, QUOTE_NONNUMERIC
 from datetime import date, datetime
@@ -35,11 +35,19 @@ class CSVExportable(BaseModel):
     _csv_writers: ClassVar[MutableMapping[str, Callable[[Any], Any]]] = dict()
     _csv_readers: ClassVar[MutableMapping[str, Callable[[Any], Any]]] = dict()
 
-    def __init_subclass__(cls, **kwargs) -> None:
+    model_config = ConfigDict(
+        frozen=False,
+        validate_assignment=True,
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs) -> None:
         """Use PEP 487 sub class constructor instead a custom one"""
         # makes sure each subclass has its own CSV field readers/writers.
         # Inherits the parents field functions using copy.deepcopy()
-        super().__init_subclass__(**kwargs)
+        super().__pydantic_init_subclass__(**kwargs)
         try:
             cls._csv_writers = cls._csv_writers.copy()  # type: ignore
             cls._csv_readers = cls._csv_readers.copy()  # type: ignore
@@ -51,7 +59,7 @@ class CSVExportable(BaseModel):
 
     def csv_headers(self) -> list[str]:
         """Provide CSV headers as list"""
-        return list(self.dict(exclude_unset=False, by_alias=False).keys())
+        return list(self.model_dump(exclude_unset=False, by_alias=False).keys())
 
     def _csv_write_fields(
         self, left: dict[str, Any]
@@ -62,6 +70,7 @@ class CSVExportable(BaseModel):
         """
         res: dict[str, Any] = dict()
         # debug ("_csv_write_fields(): starting: %s", str(type(self)))
+        # debug("Class: %s: csv_writers: %s", type(self), str(self._csv_writers))
 
         for field, encoder in self._csv_writers.items():
             # debug ("class=%s, field=%s, encoder=%s", str(type(self)), field, str(encoder))
@@ -72,16 +81,18 @@ class CSVExportable(BaseModel):
             except KeyError as err:
                 debug("field=%s not found: %s", field, err)
 
+        # debug("Class: %s: res: %s", type(self), str(res))
+        # debug("Class: %s: left: %s", type(self), str(left))
         return res, left
 
     def csv_row(self) -> dict[str, str | int | float | bool]:
         """CSVExportable._csv_row() takes care of str,int,float,bool,Enum, date and datetime.
         Class specific implementation needs to take care or serializing other fields."""
         res: dict[str, Any]
-        res, left = self._csv_write_fields(self.dict(by_alias=False))
+        res, left = self._csv_write_fields(self.model_dump(by_alias=False))
 
-        for key in left.keys():
-            value = getattr(self, key)
+        for key, value in left.items():
+            # value = getattr(self, key)
             if type(value) in {int, str, float, bool}:
                 res[key] = value
             elif isinstance(value, Enum):
@@ -93,6 +104,7 @@ class CSVExportable(BaseModel):
             else:
                 error(f"no field encoder defined for field={key}")
                 res[key] = None
+        # debug("%s", str(res))
         return self._clear_None(res)
 
     def _clear_None(
@@ -142,7 +154,8 @@ class CSVExportable(BaseModel):
         for field in row.keys():
             if row[field] != "":
                 try:
-                    field_type = cls.__fields__[field].type_
+                    if (field_type := cls.model_fields[field].annotation) is None:
+                        field_type = str
                     # debug ("field=%s, field_type=%s, value=%s", field, field_type, row[field])
                     if field_type in {int, float, str}:
                         res[field] = (field_type)(str(row[field]))
@@ -167,7 +180,7 @@ class CSVExportable(BaseModel):
                     res[field] = str(row[field])
         try:
             # debug ("from_csv(): trying parse: %s", str(res))
-            return cls.parse_obj(res)
+            return cls.model_validate(res)
         except ValidationError as err:
             error(f"Could not parse row ({row}): {err}")
         return None

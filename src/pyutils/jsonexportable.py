@@ -23,7 +23,7 @@ from pathlib import Path
 from enum import Enum
 from datetime import date, datetime
 from collections.abc import MutableMapping
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, ConfigDict
 from asyncio import CancelledError
 from aiofiles import open
 from os.path import isfile, exists
@@ -62,24 +62,44 @@ class JSONExportable(BaseModel):
     registrable model transformations. Returns None if parsing / importing / transformation fails
     """
 
-    _exclude_export_DB_fields: ClassVar[Optional[TypeExcludeDict]] = None
+    # fmt: off
+    _exclude_export_DB_fields:  ClassVar[Optional[TypeExcludeDict]] = None
     _exclude_export_src_fields: ClassVar[Optional[TypeExcludeDict]] = None
-    _include_export_DB_fields: ClassVar[Optional[TypeExcludeDict]] = None
+    _include_export_DB_fields:  ClassVar[Optional[TypeExcludeDict]] = None
     _include_export_src_fields: ClassVar[Optional[TypeExcludeDict]] = None
-    _export_DB_by_alias: bool = True
-    _exclude_defaults: bool = True
-    _exclude_unset: bool = True
-    _exclude_none: bool = True
-    _example: str = ""
+    _export_DB_by_alias:    ClassVar[bool] = True
+    _exclude_defaults:      ClassVar[bool] = True
+    _exclude_unset:         ClassVar[bool] = True
+    _exclude_none:          ClassVar[bool] = True
+    _example:               ClassVar[str]  = ""
+    # fmt: on
+
+    model_config = ConfigDict(
+        frozen=False,
+        validate_assignment=True,
+        populate_by_name=True,
+        from_attributes=True,
+    )
 
     # This is set in every subclass using __init_subclass__()
     _transformations: ClassVar[
         MutableMapping[Type, Callable[[Any], Optional[Self]]]
     ] = dict()
 
-    def __init_subclass__(cls, **kwargs) -> None:
+    def _set_skip_validation(self, name: str, value: Any) -> None:
+        """Workaround to be able to set fields without validation."""
+        attr = getattr(self.__class__, name, None)
+        if isinstance(attr, property):
+            attr.__set__(self, value)
+        else:
+            self.__dict__[name] = value
+            self.__pydantic_fields_set__.add(name)
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs) -> None:
         """Use PEP 487 sub class constructor instead a custom one"""
         # make sure each subclass has its own transformation register
+        super().__pydantic_init_subclass__(**kwargs)
         cls._transformations = dict()
 
     @classmethod
@@ -119,12 +139,12 @@ class JSONExportable(BaseModel):
         obj_in: BaseModel
         if in_type is None:
             try:
-                return cls.parse_obj(obj)
+                return cls.model_validate(obj)
             except ValidationError as err:
                 error("could not parse object as %s: %s", cls.__name__, str(err))
         else:
             try:
-                if (obj_in := in_type.parse_obj(obj)) is not None:
+                if (obj_in := in_type.model_validate(obj)) is not None:
                     return cls.transform(obj_in)
             except ValidationError as err:
                 error("could not parse object as %s: %s", cls.__name__, str(err))
@@ -150,9 +170,9 @@ class JSONExportable(BaseModel):
         """Open replay JSON file and return class instance"""
         try:
             async with open(filename, "r") as f:
-                return cls.parse_raw(await f.read())
-        except ValidationError as err:
-            debug(f"Error parsing file: {filename}: {err}")
+                return cls.model_validate_json(await f.read())
+        except ValueError as err:
+            debug(f"Could not parse {type(cls)} from file: {filename}: {err}")
             if exceptions:
                 raise
         except OSError as err:
@@ -165,8 +185,8 @@ class JSONExportable(BaseModel):
     def parse_str(cls, content: str) -> Self | None:
         """return class instance from a JSON string"""
         try:
-            return cls.parse_raw(content)
-        except ValidationError as err:
+            return cls.model_validate_json(content)
+        except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
 
@@ -238,7 +258,7 @@ class JSONExportable(BaseModel):
     def example_instance(cls) -> Self:
         """return a example instance of the class"""
         if len(cls._example) > 0:
-            return cls.parse_raw(cls._example)
+            return cls.model_validate_json(cls._example)
         raise NotImplementedError
 
     def __hash__(self) -> int:
@@ -253,7 +273,7 @@ class JSONExportable(BaseModel):
             "by_alias": self._export_DB_by_alias,
         }
         params = self._export_helper(params=params, fields=fields, **kwargs)
-        return self.dict(**params)
+        return self.model_dump(**params)
 
     def obj_src(self, fields: list[str] | None = None, **kwargs) -> dict:
         params: dict[str, Any] = {
@@ -264,7 +284,7 @@ class JSONExportable(BaseModel):
             "by_alias": not self._export_DB_by_alias,
         }
         params = self._export_helper(params=params, fields=fields, **kwargs)
-        return self.dict(**params)
+        return self.model_dump(**params)
 
     def json_db(self, fields: list[str] | None = None, **kwargs) -> str:
         params: dict[str, Any] = {
@@ -274,7 +294,7 @@ class JSONExportable(BaseModel):
             "by_alias": self._export_DB_by_alias,
         }
         params = self._export_helper(params=params, fields=fields, **kwargs)
-        return self.json(**params)
+        return self.model_dump_json(**params)
 
     def json_src(self, fields: list[str] | None = None, **kwargs) -> str:
         params: dict[str, Any] = {
@@ -285,7 +305,7 @@ class JSONExportable(BaseModel):
             "by_alias": not self._export_DB_by_alias,
         }
         params = self._export_helper(params=params, fields=fields, **kwargs)
-        return self.json(**params)
+        return self.model_dump_json(**params)
 
     async def save_json(self, filename: Path | str) -> int:
         """Save object JSON into a file"""

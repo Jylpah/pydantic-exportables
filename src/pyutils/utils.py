@@ -307,8 +307,8 @@ async def get_url_model(
         if (content := await get_url(session, url, retries)) is None:
             debug("get_url() returned None")
             return None
-        return resp_model.parse_raw(content)
-    except ValidationError as err:
+        return resp_model.model_validate_json(content)
+    except ValueError as err:
         debug(
             f"{resp_model.__name__}: {url}: response={content}: Validation error={err}"
         )
@@ -342,4 +342,11 @@ def set_config(
         config[section][option] = str(fallback)
     else:
         return None
-    return cast(T, config[section][option])
+    if isinstance(fallback, bool):
+        return config.getboolean(section, option)  # type: ignore
+    elif isinstance(fallback, int):
+        return config.getint(section, option)  # type: ignore
+    elif isinstance(fallback, float):
+        return config.getfloat(section, option)  # type: ignore
+    else:
+        return config.get(section, option)  # type: ignore
