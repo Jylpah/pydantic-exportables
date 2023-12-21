@@ -40,10 +40,11 @@ async def get_model(
     assert url is not None, "url cannot be None"
     content: str | None = None
     try:
-        if (content := await get_url(session, url, retries)) is None:
-            debug("get_url() returned None")
-            return None
-        return resp_model.model_validate_json(content)
+        if (
+            content := await get_url(session=session, url=url, retries=retries)
+        ) is not None:
+            return resp_model.model_validate_json(content)
+        debug("get_url() returned None")
     except ValueError as err:
         debug(
             f"{resp_model.__name__}: {url}: response={content}: Validation error={err}"
