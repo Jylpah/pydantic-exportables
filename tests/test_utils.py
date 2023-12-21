@@ -1,11 +1,10 @@
 import sys
 import pytest  # type: ignore
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from itertools import pairwise, accumulate
 from functools import cached_property
-from math import ceil
-from typing import Generator, Any
+from typing import Generator
 from multiprocessing import Process
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
@@ -13,8 +12,7 @@ from socketserver import ThreadingMixIn
 from pydantic import BaseModel, Field
 from enum import StrEnum, IntEnum
 
-from asyncio import Task, create_task, sleep, gather, timeout, TimeoutError
-from random import random
+from asyncio import sleep
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
@@ -228,6 +226,11 @@ def model_path() -> str:
     return MODEL_PATH
 
 
+# I do not understand why this works on Windows when the same code fails on pyutils
+# @pytest.mark.skipif(
+#     sys.platform == "win32",
+#     reason="not supported on windows: asyncio.loop.create_unix_connection",
+# )
 @pytest.mark.timeout(20)
 @pytest.mark.asyncio
 async def test_1_get_model(server_url: str, model_path: str) -> None:
@@ -236,6 +239,7 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
     N: int = N_SLOW
     url: str = server_url + model_path
     res: JSONParent | None
+    await sleep(2)  # wait for the slow GH instances to start HTTPserver...
     async with ThrottledClientSession(rate_limit=rate_limit) as session:
         for _ in range(N):
             if (
