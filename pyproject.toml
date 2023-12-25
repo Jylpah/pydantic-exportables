@@ -61,9 +61,12 @@ plugins = ["pydantic.mypy"]
 exclude = ['tmp']
 mypy_path = ['src']
 
-[tool.black]
-# line-length = 100
-include = '\.pyi?$'
+[tool.ruff]
+# line-length = 88
+include = ["pyproject.toml", "src/**/*.py", "tests/**/*.py"]
+indent-width = 4
+extend-include = ["*.ipynb"]
+fixable = ["ALL"]
 
 [tool.pytest.ini_options]
 minversion = "7.4"
