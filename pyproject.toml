@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-exportables"
-version = "1.0.1"
+version = "1.0.2"
 authors = [{ name = "Jylpah", email = "jylpah@gmail.com" }]
 description = "Python Pydantic BaseModel extension and helpers for easier import/export to different formats (JSON, CSV, TXT)"
 readme = "README.md"
@@ -17,7 +17,7 @@ classifiers = [
 ]
 dependencies = [
     "aiofiles~=23.1",
-    "aiohttp~=3.9",
+    "aiohttp~=3.9.1",
     "aiodns~=3.0",
     "aioconsole~=0.6",
     "aiocsv~=1.2",
