@@ -6,8 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
 
-from pydantic_exportables import AliasMapper
-from pydantic_exportables.aliasmapper import T
+from pydantic_exportables import AliasMapper  # noqa: E402
 
 
 ########################################################
@@ -89,7 +88,7 @@ def test_3_map_fails(
         failing_indexes.append((field + "_DOES_NOT_EXISTS", ndx))
 
     try:
-        alias_map: dict[str, NdxType] = mapper.map(failing_indexes)
+        _: dict[str, NdxType] = mapper.map(failing_indexes)
     except KeyError:
         assert True
         return None

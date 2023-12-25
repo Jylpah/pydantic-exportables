@@ -11,15 +11,20 @@ from urllib.parse import urlparse
 from socketserver import ThreadingMixIn
 from pydantic import BaseModel, Field
 from enum import StrEnum, IntEnum
-
+from pyutils.utils import epoch_now
+from pyutils import ThrottledClientSession
 from asyncio import sleep
 import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
 
-from pydantic_exportables import Idx, JSONExportable, Importable, get_model
-from pyutils.utils import epoch_now
-from pyutils import ThrottledClientSession
+from pydantic_exportables import (  # noqa: E402
+    Idx,
+    JSONExportable,
+    Importable,
+    get_model,
+)
+
 
 logger = logging.getLogger()
 error = logger.error
@@ -117,8 +122,8 @@ class _HttpRequestHandler(BaseHTTPRequestHandler):
         if self.url.path == MODEL_PATH:
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            l: int = len(self._res_JSONParent)
-            idx: int = epoch_now() % l
+            length: int = len(self._res_JSONParent)
+            idx: int = epoch_now() % length
             res: JSONParent = self._res_JSONParent[idx]
             self.wfile.write(res.json_src().encode())
 
@@ -238,7 +243,6 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
     rate_limit: float = RATE_SLOW
     N: int = N_SLOW
     url: str = server_url + model_path
-    res: JSONParent | None
     await sleep(2)  # wait for the slow GH instances to start HTTPserver...
     async with ThrottledClientSession(rate_limit=rate_limit) as session:
         for _ in range(N):

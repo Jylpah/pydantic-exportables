@@ -8,7 +8,7 @@ from .jsonexportable import (
     DESCENDING as DESCENDING,
     ASCENDING as ASCENDING,
     TEXT as TEXT,
-    I as I,
+    IdxType as IdxType,
 )
 from .csvexportable import CSVExportable as CSVExportable
 from .exportable import (
@@ -23,11 +23,15 @@ from .importable import (
     Importable as Importable,
 )
 from .utils import (
-    get_model,
+    get_model as get_model,
 )
 
 
 __all__ = [
     "aliasmapper",
+    "jsonexportable",
+    "csvexportable",
+    "exportable",
+    "importable",
     "utils",
 ]

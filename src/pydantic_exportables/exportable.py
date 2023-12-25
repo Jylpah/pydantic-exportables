@@ -2,11 +2,8 @@ import logging
 from typing import (
     Type,
     Literal,
-    TypeVar,
-    Union,
     AsyncIterable,
     AsyncIterator,
-    get_args,
 )
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict
@@ -14,8 +11,7 @@ from asyncio import CancelledError
 from aiofiles import open
 from os import linesep
 from aiocsv.writers import AsyncDictWriter
-from csv import Dialect, excel, QUOTE_NONNUMERIC
-from bson.objectid import ObjectId
+from csv import Dialect, excel
 from abc import abstractmethod
 
 from pyutils.eventcounter import EventCounter
@@ -29,17 +25,6 @@ error = logger.error
 message = logger.warning
 verbose = logger.info
 debug = logger.debug
-
-
-DESCENDING: Literal[-1] = -1
-ASCENDING: Literal[1] = 1
-TEXT: Literal["text"] = "text"
-
-Idx = Union[str, int, ObjectId]
-BackendIndexType = Literal[-1, 1, "text"]
-BackendIndex = tuple[str, BackendIndexType]
-I = TypeVar("I", bound=Idx)
-
 
 ########################################################
 #
@@ -113,8 +98,8 @@ async def export_csv(
                 exportable = await anext(aiterator, None)
 
             debug("export finished")
-        except CancelledError as err:
-            debug(f"Cancelled")
+        except CancelledError:
+            debug("Cancelled")
             raise
 
     else:  # File
@@ -148,8 +133,8 @@ async def export_csv(
                         stats.log("errors")
                     exportable = await anext(aiterator, None)
 
-        except CancelledError as err:
-            debug(f"Cancelled")
+        except CancelledError:
+            debug("Cancelled")
             raise
         except OSError as err:
             error(f"could not write to {filename}: {err}")
@@ -200,8 +185,8 @@ async def export_json(
                         error(f"{err}")
                         stats.log("errors")
 
-    except CancelledError as err:
-        debug(f"Cancelled")
+    except CancelledError:
+        debug("Cancelled")
         raise
     except Exception as err:
         error(f"error exporting to JSON: {err}")
@@ -243,7 +228,7 @@ async def export_txt(
                         error(f"error exporting to text type={type(exportable)}: {err}")
                         stats.log("errors")
 
-    except CancelledError as err:
+    except CancelledError:
         debug("Cancelled")
     except Exception as err:
         error(f"error exporting to text: {err}")
@@ -271,11 +256,32 @@ async def export(
 
     try:
         if format == "txt":
-            stats.merge(await export_txt(iterable, filename=filename, force=force, append=append))  # type: ignore
+            stats.merge(
+                await export_txt(
+                    iterable,  # type: ignore
+                    filename=filename,
+                    force=force,
+                    append=append,
+                )
+            )
         elif format == "json":
-            stats.merge(await export_json(iterable, filename=filename, force=force, append=append))  # type: ignore
+            stats.merge(
+                await export_json(
+                    iterable,  # type: ignore
+                    filename=filename,
+                    force=force,
+                    append=append,
+                )
+            )
         elif format == "csv":
-            stats.merge(await export_csv(iterable, filename=filename, force=force, append=append))  # type: ignore
+            stats.merge(
+                await export_csv(
+                    iterable,  # type: ignore
+                    filename=filename,
+                    force=force,
+                    append=append,
+                )
+            )  # type: ignore
         else:
             raise ValueError(f"Unknown format: {format}")
     except Exception as err:
