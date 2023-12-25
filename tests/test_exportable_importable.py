@@ -1,11 +1,10 @@
 import sys
 import pytest  # type: ignore
-from typing import Literal, Self
+from typing import Self
 from pydantic import Field
 from pathlib import Path
 from time import time
 from datetime import date, datetime
-from asyncio.queues import Queue
 from enum import StrEnum, IntEnum
 import json
 import logging
@@ -14,11 +13,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
 
 from pydantic_exportables import (
     JSONExportable,
-    export_json,
     export,
     Idx,
     CSVExportable,
-    export_csv,
     TXTExportable,
     TXTImportable,
     Importable,
@@ -323,13 +320,13 @@ async def test_2_json_exportable_include_exclude() -> None:
     parent_src = json.loads(parent.json_src(fields=["name", "array"]))
     assert (
         "amount" not in parent_src
-    ), f"json_src() failed: excluded field 'amount' included"
+    ), "json_src() failed: excluded field 'amount' included"
     assert "array" in parent_src, "json_src() failed: included field 'array' excluded"
 
     parent_db = json.loads(parent.json_db(fields=["name", "array"]))
     assert (
         "amount" not in parent_db
-    ), f"json_db() failed: excluded field 'amount' included"
+    ), "json_db() failed: excluded field 'amount' included"
     assert "array" in parent_db, "json_db() failed: included field 'array' excluded"
 
 
@@ -394,7 +391,7 @@ async def test_4_csv_exportable_importable(tmp_path: Path, csv_data: list[CSVPer
                 csv_data.pop(ndx)
             else:
                 assert False, f"imported data not in the original: {data_imported}"
-        except ValueError as err:
+        except ValueError:
             assert (
                 False
             ), f"export/import conversion error. imported data={data_imported} is not in input data"

@@ -9,7 +9,7 @@ from typing import Type, Any, Self, AsyncGenerator, Callable, Self, ClassVar
 from collections.abc import MutableMapping
 from pydantic import BaseModel, ValidationError, ConfigDict
 from aiocsv.readers import AsyncDictReader
-from csv import Dialect, excel, QUOTE_NONNUMERIC
+from csv import Dialect, excel
 from datetime import date, datetime
 from aiofiles import open
 from enum import Enum
@@ -136,7 +136,7 @@ class CSVExportable(BaseModel):
                 if row[field] != "":
                     res[field] = decoder(row[field])
                 del row[field]
-            except KeyError as err:
+            except KeyError:
                 debug("field=%s not found", field)
         # debug ("class=%s", str(cls))
 
@@ -172,9 +172,9 @@ class CSVExportable(BaseModel):
                         res[field] = (field_type)(str(row[field]))
                 except KeyError:  # field not in cls
                     continue
-                except AttributeError as err:
+                except AttributeError:
                     error(f"Class {cls.__name__}() does not have attribute: {field}")
-                except Exception as err:
+                except Exception:
                     # debug ("%s raised, trying direct assignment: %s", type(err), err)
                     res[field] = str(row[field])
         try:
