@@ -258,19 +258,28 @@ async def export(
         if format == "txt":
             stats.merge(
                 await export_txt(
-                    iterable, filename=filename, force=force, append=append  # type: ignore
+                    iterable,  # type: ignore
+                    filename=filename,
+                    force=force,
+                    append=append,
                 )
             )
         elif format == "json":
             stats.merge(
                 await export_json(
-                    iterable, filename=filename, force=force, append=append  # type: ignore
+                    iterable,  # type: ignore
+                    filename=filename,
+                    force=force,
+                    append=append,
                 )
-            )  # type: ignore
+            )
         elif format == "csv":
             stats.merge(
                 await export_csv(
-                    iterable, filename=filename, force=force, append=append  # type: ignore
+                    iterable,  # type: ignore
+                    filename=filename,
+                    force=force,
+                    append=append,
                 )
             )  # type: ignore
         else:

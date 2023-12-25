@@ -394,9 +394,7 @@ async def test_4_csv_exportable_importable(tmp_path: Path, csv_data: list[CSVPer
             else:
                 assert False, f"imported data not in the original: {data_imported}"
         except ValueError:
-            assert (
-                False
-            ), f"export/import conversion error. imported data={data_imported} is not in input data"
+            assert False, f"export/import conversion error. imported data={data_imported} is not in input data"
 
     assert (
         len(csv_data) == 0
