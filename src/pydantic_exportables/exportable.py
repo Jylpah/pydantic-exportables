@@ -256,11 +256,23 @@ async def export(
 
     try:
         if format == "txt":
-            stats.merge(await export_txt(iterable, filename=filename, force=force, append=append))  # type: ignore
+            stats.merge(
+                await export_txt(
+                    iterable, filename=filename, force=force, append=append  # type: ignore
+                )
+            )
         elif format == "json":
-            stats.merge(await export_json(iterable, filename=filename, force=force, append=append))  # type: ignore
+            stats.merge(
+                await export_json(
+                    iterable, filename=filename, force=force, append=append  # type: ignore
+                )
+            )  # type: ignore
         elif format == "csv":
-            stats.merge(await export_csv(iterable, filename=filename, force=force, append=append))  # type: ignore
+            stats.merge(
+                await export_csv(
+                    iterable, filename=filename, force=force, append=append  # type: ignore
+                )
+            )  # type: ignore
         else:
             raise ValueError(f"Unknown format: {format}")
     except Exception as err:

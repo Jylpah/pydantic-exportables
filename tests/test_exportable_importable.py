@@ -257,7 +257,9 @@ async def test_1_json_exportable(tmp_path: Path, json_data: list[JSONParent]):
 
     await export(awrap(json_data), format="json", filename="-")  # type: ignore
     await export(awrap(json_data), format="json", filename=fn)  # type: ignore
-    await export(awrap(json_data), format="json", filename=str(fn.resolve()), force=True)  # type: ignore
+    await export(
+        awrap(json_data), format="json", filename=str(fn.resolve()), force=True
+    )  # type: ignore
 
     imported: set[JSONParent] = set()
     try:
