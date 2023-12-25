@@ -46,7 +46,7 @@ TEXT: Literal["text"] = "text"
 Idx = Union[str, int, ObjectId]
 BackendIndexType = Literal[-1, 1, "text"]
 BackendIndex = tuple[str, BackendIndexType]
-I = TypeVar("I", bound=Idx)
+IdxType = TypeVar("IdxType", bound=Idx)
 
 
 class JSONExportable(BaseModel):
@@ -213,13 +213,13 @@ class JSONExportable(BaseModel):
             try:
                 params["exclude"].update(kwargs["exclude"])
                 del kwargs["exclude"]
-            except:
+            except Exception:
                 pass
         elif "include" in kwargs:
             try:
                 params["include"].update(kwargs["include"])
                 del kwargs["include"]
-            except:
+            except Exception:
                 pass
         # else:
         #     for f in ["exclude", "include"]:

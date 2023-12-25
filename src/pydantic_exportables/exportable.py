@@ -2,8 +2,6 @@ import logging
 from typing import (
     Type,
     Literal,
-    TypeVar,
-    Union,
     AsyncIterable,
     AsyncIterator,
 )
@@ -14,7 +12,6 @@ from aiofiles import open
 from os import linesep
 from aiocsv.writers import AsyncDictWriter
 from csv import Dialect, excel
-from bson.objectid import ObjectId
 from abc import abstractmethod
 
 from pyutils.eventcounter import EventCounter
@@ -28,17 +25,6 @@ error = logger.error
 message = logger.warning
 verbose = logger.info
 debug = logger.debug
-
-
-DESCENDING: Literal[-1] = -1
-ASCENDING: Literal[1] = 1
-TEXT: Literal["text"] = "text"
-
-Idx = Union[str, int, ObjectId]
-BackendIndexType = Literal[-1, 1, "text"]
-BackendIndex = tuple[str, BackendIndexType]
-I = TypeVar("I", bound=Idx)
-
 
 ########################################################
 #

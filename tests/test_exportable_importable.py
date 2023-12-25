@@ -11,7 +11,7 @@ import logging
 
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
 
-from pydantic_exportables import (
+from pydantic_exportables import (  # noqa: E402
     JSONExportable,
     export,
     Idx,
@@ -20,7 +20,7 @@ from pydantic_exportables import (
     TXTImportable,
     Importable,
 )
-from pyutils import awrap
+from pyutils import awrap  # noqa: E402
 
 ########################################################
 #

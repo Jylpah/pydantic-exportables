@@ -3,7 +3,6 @@ from typing import (
     TypeVar,
     Self,
     AsyncGenerator,
-    Self,
 )
 from abc import ABCMeta
 from pydantic import BaseModel, ValidationError
