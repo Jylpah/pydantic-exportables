@@ -72,6 +72,7 @@ fixable = ["ALL"]
 [tool.pytest.ini_options]
 minversion = "7.4"
 addopts = "-v --cov=src"
+pythonpath = "src" # avoid import path append in test files
 filterwarnings = [
     'ignore:Inheritance class ThrottledClientSession from ClientSession is discouraged:DeprecationWarning',
 ]
