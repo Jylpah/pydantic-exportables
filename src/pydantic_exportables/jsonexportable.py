@@ -254,8 +254,11 @@ class JSONExportable(BaseModel):
         raise NotImplementedError
 
     def __hash__(self) -> int:
-        """Make object hashable, but using index fields only"""
-        return hash(self.index)
+        """Make object hashable using index fields if defined"""
+        try:
+            return hash(self.index)
+        except NotImplementedError:
+            return hash(id(self))
 
     def obj_db(self, fields: list[str] | None = None, **kwargs) -> dict:
         params: dict[str, Any] = {
@@ -311,3 +314,27 @@ class JSONExportable(BaseModel):
         except Exception as err:
             error(f"Error writing file {filename}: {err}")
         return -1
+
+    def update(self, new: Self, match_index: bool = True) -> bool:
+        """
+        update instance with new. Ignore default values.
+        By default matches only instance with the same index.
+        """
+        if match_index and self.index != new.index:
+            debug(
+                f"new instance has different index: {str(self.index)} != {str(new.index)}"
+            )
+            return False
+        updated: bool = False
+        for key in new.model_fields_set:
+            value = getattr(new, key)
+            if isinstance(value, JSONExportable):
+                old = getattr(self, key)
+                if isinstance(old, JSONExportable):
+                    if old.update(value, match_index=match_index):
+                        updated = True
+                    continue
+            self._set_skip_validation(key, value)
+            updated = True
+
+        return updated

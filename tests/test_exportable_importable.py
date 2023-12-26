@@ -1,17 +1,12 @@
-import sys
 import pytest  # type: ignore
-from typing import Self
+from typing import Self, List
 from pydantic import Field
 from pathlib import Path
-from time import time
 from datetime import date, datetime
 from enum import StrEnum, IntEnum
 import json
 import logging
-
-sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
-
-from pydantic_exportables import (  # noqa: E402
+from pydantic_exportables import (
     JSONExportable,
     export,
     Idx,
@@ -20,7 +15,8 @@ from pydantic_exportables import (  # noqa: E402
     TXTImportable,
     Importable,
 )
-from pyutils import awrap  # noqa: E402
+from pyutils import awrap
+from pyutils.utils import epoch_now
 
 ########################################################
 #
@@ -39,10 +35,6 @@ verbose = logger.info
 debug = logger.debug
 
 
-def epoch() -> int:
-    return int(time())
-
-
 class Eyes(StrEnum):
     blue = "Blue"
     grey = "Grey"
@@ -58,7 +50,7 @@ class Hair(IntEnum):
 
 class JSONChild(JSONExportable):
     name: str
-    created: int = Field(default_factory=epoch)
+    created: int = Field(default_factory=epoch_now)
 
     @property
     def index(self) -> Idx:
@@ -75,8 +67,8 @@ class JSONParent(JSONExportable, Importable):
     name: str
     amount: int = 0
     correct: bool = Field(default=False, alias="c")
-    array: list[str] = list()
-    child: JSONChild | None = None
+    array: List[str] = Field(default_factory=list)
+    child: JSONChild | None = Field(default=None)
 
     _exclude_unset = False
 
@@ -89,6 +81,20 @@ class JSONParent(JSONExportable, Importable):
     def indexes(self) -> dict[str, Idx]:
         """return backend indexes"""
         return {"name": self.index}
+
+
+class JSONAdult(JSONExportable):
+    name: str
+    age: int = Field(default=40)
+    child: JSONChild | None = Field(default=None)
+
+    def transform2JSONParent(self) -> JSONParent:
+        return JSONParent(
+            name=self.name, amount=self.age, correct=True, child=self.child
+        )
+
+
+JSONParent.register_transformation(JSONAdult, JSONAdult.transform2JSONParent)
 
 
 def today() -> datetime:
@@ -175,10 +181,10 @@ class CSVChild(CSVPerson):
 
 
 @pytest.fixture
-def json_data() -> list[JSONParent]:
+def json_data() -> List[JSONParent]:
     c1 = JSONChild(name="c1")
     c3 = JSONChild(name="c3")
-    res: list[JSONParent] = list()
+    res: List[JSONParent] = list()
     res.append(JSONParent(name="P1", amount=1, array=["one", "two"], child=c1))
     res.append(JSONParent(name="P2", amount=-6, array=["three", "four"]))
     res.append(JSONParent(name="P3", amount=-6, child=c3))
@@ -186,8 +192,16 @@ def json_data() -> list[JSONParent]:
 
 
 @pytest.fixture
-def csv_data() -> list[CSVPerson]:
-    res: list[CSVPerson] = list()
+def json_adults() -> List[JSONAdult]:
+    res: List[JSONAdult] = list()
+    res.append(JSONAdult(name="Alice", age=35, child=None))
+    res.append(JSONAdult(name="Bob", age=38, child=JSONChild(name="Ted")))
+    return res
+
+
+@pytest.fixture
+def csv_data() -> List[CSVPerson]:
+    res: List[CSVPerson] = list()
     res.append(
         CSVPerson(
             name="Marie",
@@ -223,8 +237,8 @@ def csv_data() -> list[CSVPerson]:
 
 
 @pytest.fixture
-def txt_data() -> list[TXTPerson]:
-    res: list[TXTPerson] = list()
+def txt_data() -> List[TXTPerson]:
+    res: List[TXTPerson] = list()
     res.append(
         TXTPerson(
             name="Marie", age=0, height=1.85, woman=True, eyes=Eyes.brown, hair=Hair.red
@@ -252,7 +266,7 @@ def txt_data() -> list[TXTPerson]:
 
 
 @pytest.mark.asyncio
-async def test_1_json_exportable(tmp_path: Path, json_data: list[JSONParent]):
+async def test_1_json_exportable(tmp_path: Path, json_data: List[JSONParent]):
     fn: Path = tmp_path / "export.json"
 
     await export(awrap(json_data), format="json", filename="-")  # type: ignore
@@ -319,21 +333,84 @@ async def test_2_json_exportable_include_exclude() -> None:
                 incl in parent_db
             ), f"json_db() failed: included field {incl} excluded"
 
-    parent_src = json.loads(parent.json_src(fields=["name", "array"]))
+    parent_src = parent.obj_src(fields=["name", "array"])
     assert (
         "amount" not in parent_src
     ), "json_src() failed: excluded field 'amount' included"
     assert "array" in parent_src, "json_src() failed: included field 'array' excluded"
 
-    parent_db = json.loads(parent.json_db(fields=["name", "array"]))
+    parent_db = parent.obj_db(fields=["name", "array"])
     assert (
         "amount" not in parent_db
     ), "json_db() failed: excluded field 'amount' included"
     assert "array" in parent_db, "json_db() failed: included field 'array' excluded"
 
+    parent_src = parent.obj_src()
+    assert (
+        parent_new := JSONParent.from_obj(parent_src)
+    ) is not None, "could not create object from exported model"
+    assert (
+        parent == parent_new
+    ), f"re-created object is different to original: {parent_new}"
+
+    parent_db = parent.obj_db()
+    assert (
+        parent_new := JSONParent.from_obj(parent_db)
+    ) is not None, "could not create object from exported model"
+    assert (
+        parent == parent_new
+    ), f"re-created object is different to original: {parent_new}"
+
+
+def test_3_jsonexportable_update(json_data: List[JSONParent]):
+    """
+    test for JSONExportable.update()
+    """
+    p0: JSONParent = json_data[0]
+    p1: JSONParent = json_data[1]
+    p2: JSONParent = json_data[2]
+
+    p: JSONParent = p0.model_copy(deep=True)
+
+    for new in json_data[1:]:
+        assert not p.update(
+            new, match_index=True
+        ), "update succeeded even the indexes do not match"
+    assert p.update(
+        p1, match_index=False
+    ), "update did not succeeded even the indexes were ignored"
+    assert all(
+        [
+            p.name == p1.name,
+            p.amount == p1.amount,
+            p.correct == p1.correct,
+            p.array == p1.array,
+            p.child == p0.child,
+        ]
+    ), f"update() failed: updated={str(p)}"
+    assert p.update(
+        p2, match_index=False
+    ), "update did not succeeded even the indexes were ignored"
+    assert all(
+        [
+            p.name == p2.name,
+            p.amount == p2.amount,
+            p.correct == p2.correct,
+            p.array == p1.array,
+            p.child == p2.child,
+        ]
+    ), f"update() failed: updated={str(p)}"
+
+
+def test_4_jsonexportable_transform(json_adults: List[JSONAdult]):
+    res = JSONParent.transform_many(json_adults)
+    assert len(res) == len(
+        json_adults
+    ), f"could not transform all data: {len(res)} != {len(json_adults)}"
+
 
 @pytest.mark.asyncio
-async def test_3_txt_exportable_importable(tmp_path: Path, txt_data: list[TXTPerson]):
+async def test_5_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
     fn: Path = tmp_path / "export.txt"
 
     await export(awrap(txt_data), "txt", filename="-")  # type: ignore
@@ -363,7 +440,7 @@ async def test_3_txt_exportable_importable(tmp_path: Path, txt_data: list[TXTPer
 
 
 @pytest.mark.asyncio
-async def test_4_csv_exportable_importable(tmp_path: Path, csv_data: list[CSVPerson]):
+async def test_6_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
     fn: Path = tmp_path / "export.csv"
 
     await export(awrap(csv_data), "csv", filename="-")  # type: ignore
@@ -394,7 +471,9 @@ async def test_4_csv_exportable_importable(tmp_path: Path, csv_data: list[CSVPer
             else:
                 assert False, f"imported data not in the original: {data_imported}"
         except ValueError:
-            assert False, f"export/import conversion error. imported data={data_imported} is not in input data"
+            assert (
+                False
+            ), f"export/import conversion error. imported data={data_imported} is not in input data"
 
     assert (
         len(csv_data) == 0
