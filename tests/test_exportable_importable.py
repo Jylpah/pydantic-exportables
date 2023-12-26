@@ -1,8 +1,7 @@
 import pytest  # type: ignore
-from typing import Self
+from typing import Self, List
 from pydantic import Field
 from pathlib import Path
-from time import time
 from datetime import date, datetime
 from enum import StrEnum, IntEnum
 import json
@@ -17,6 +16,7 @@ from pydantic_exportables import (
     Importable,
 )
 from pyutils import awrap
+from pyutils.utils import epoch_now
 
 ########################################################
 #
@@ -35,10 +35,6 @@ verbose = logger.info
 debug = logger.debug
 
 
-def epoch() -> int:
-    return int(time())
-
-
 class Eyes(StrEnum):
     blue = "Blue"
     grey = "Grey"
@@ -54,7 +50,7 @@ class Hair(IntEnum):
 
 class JSONChild(JSONExportable):
     name: str
-    created: int = Field(default_factory=epoch)
+    created: int = Field(default_factory=epoch_now)
 
     @property
     def index(self) -> Idx:
@@ -71,8 +67,8 @@ class JSONParent(JSONExportable, Importable):
     name: str
     amount: int = 0
     correct: bool = Field(default=False, alias="c")
-    array: list[str] = list()
-    child: JSONChild | None = None
+    array: List[str] = Field(default_factory=list)
+    child: JSONChild | None = Field(default=None)
 
     _exclude_unset = False
 
@@ -171,10 +167,10 @@ class CSVChild(CSVPerson):
 
 
 @pytest.fixture
-def json_data() -> list[JSONParent]:
+def json_data() -> List[JSONParent]:
     c1 = JSONChild(name="c1")
     c3 = JSONChild(name="c3")
-    res: list[JSONParent] = list()
+    res: List[JSONParent] = list()
     res.append(JSONParent(name="P1", amount=1, array=["one", "two"], child=c1))
     res.append(JSONParent(name="P2", amount=-6, array=["three", "four"]))
     res.append(JSONParent(name="P3", amount=-6, child=c3))
@@ -182,8 +178,8 @@ def json_data() -> list[JSONParent]:
 
 
 @pytest.fixture
-def csv_data() -> list[CSVPerson]:
-    res: list[CSVPerson] = list()
+def csv_data() -> List[CSVPerson]:
+    res: List[CSVPerson] = list()
     res.append(
         CSVPerson(
             name="Marie",
@@ -219,8 +215,8 @@ def csv_data() -> list[CSVPerson]:
 
 
 @pytest.fixture
-def txt_data() -> list[TXTPerson]:
-    res: list[TXTPerson] = list()
+def txt_data() -> List[TXTPerson]:
+    res: List[TXTPerson] = list()
     res.append(
         TXTPerson(
             name="Marie", age=0, height=1.85, woman=True, eyes=Eyes.brown, hair=Hair.red
@@ -248,7 +244,7 @@ def txt_data() -> list[TXTPerson]:
 
 
 @pytest.mark.asyncio
-async def test_1_json_exportable(tmp_path: Path, json_data: list[JSONParent]):
+async def test_1_json_exportable(tmp_path: Path, json_data: List[JSONParent]):
     fn: Path = tmp_path / "export.json"
 
     await export(awrap(json_data), format="json", filename="-")  # type: ignore
@@ -328,8 +324,48 @@ async def test_2_json_exportable_include_exclude() -> None:
     assert "array" in parent_db, "json_db() failed: included field 'array' excluded"
 
 
+def test_3_jsonexportable_update(json_data: List[JSONParent]):
+    """
+    test for JSONExportable.update()
+    """
+    p0: JSONParent = json_data[0]
+    p1: JSONParent = json_data[1]
+    p2: JSONParent = json_data[2]
+
+    p: JSONParent = p0.model_copy(deep=True)
+
+    for new in json_data[1:]:
+        assert not p.update(
+            new, match_index=True
+        ), "update succeeded even the indexes do not match"
+    assert p.update(
+        p1, match_index=False
+    ), "update did not succeeded even the indexes were ignored"
+    assert all(
+        [
+            p.name == p1.name,
+            p.amount == p1.amount,
+            p.correct == p1.correct,
+            p.array == p1.array,
+            p.child == p0.child,
+        ]
+    ), f"update() failed: updated={str(p)}"
+    assert p.update(
+        p2, match_index=False
+    ), "update did not succeeded even the indexes were ignored"
+    assert all(
+        [
+            p.name == p2.name,
+            p.amount == p2.amount,
+            p.correct == p2.correct,
+            p.array == p1.array,
+            p.child == p2.child,
+        ]
+    ), f"update() failed: updated={str(p)}"
+
+
 @pytest.mark.asyncio
-async def test_3_txt_exportable_importable(tmp_path: Path, txt_data: list[TXTPerson]):
+async def test_4_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
     fn: Path = tmp_path / "export.txt"
 
     await export(awrap(txt_data), "txt", filename="-")  # type: ignore
@@ -359,7 +395,7 @@ async def test_3_txt_exportable_importable(tmp_path: Path, txt_data: list[TXTPer
 
 
 @pytest.mark.asyncio
-async def test_4_csv_exportable_importable(tmp_path: Path, csv_data: list[CSVPerson]):
+async def test_5_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
     fn: Path = tmp_path / "export.csv"
 
     await export(awrap(csv_data), "csv", filename="-")  # type: ignore
