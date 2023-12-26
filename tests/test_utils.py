@@ -1,6 +1,4 @@
-import sys
 import pytest  # type: ignore
-from pathlib import Path
 from datetime import datetime
 from itertools import pairwise, accumulate
 from functools import cached_property
@@ -15,10 +13,7 @@ from pyutils.utils import epoch_now
 from pyutils import ThrottledClientSession
 from asyncio import sleep
 import logging
-
-sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
-
-from pydantic_exportables import (  # noqa: E402
+from pydantic_exportables import (
     Idx,
     JSONExportable,
     Importable,

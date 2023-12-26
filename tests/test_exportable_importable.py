@@ -1,4 +1,3 @@
-import sys
 import pytest  # type: ignore
 from typing import Self
 from pydantic import Field
@@ -8,10 +7,7 @@ from datetime import date, datetime
 from enum import StrEnum, IntEnum
 import json
 import logging
-
-sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
-
-from pydantic_exportables import (  # noqa: E402
+from pydantic_exportables import (
     JSONExportable,
     export,
     Idx,
@@ -20,7 +16,7 @@ from pydantic_exportables import (  # noqa: E402
     TXTImportable,
     Importable,
 )
-from pyutils import awrap  # noqa: E402
+from pyutils import awrap
 
 ########################################################
 #
@@ -394,7 +390,9 @@ async def test_4_csv_exportable_importable(tmp_path: Path, csv_data: list[CSVPer
             else:
                 assert False, f"imported data not in the original: {data_imported}"
         except ValueError:
-            assert False, f"export/import conversion error. imported data={data_imported} is not in input data"
+            assert (
+                False
+            ), f"export/import conversion error. imported data={data_imported} is not in input data"
 
     assert (
         len(csv_data) == 0

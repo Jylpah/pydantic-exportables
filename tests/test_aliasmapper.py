@@ -1,11 +1,6 @@
-import sys
 import pytest  # type: ignore
 from typing import Literal
 from pydantic import BaseModel, Field
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.resolve() / "src"))
-
 from pydantic_exportables import AliasMapper  # noqa: E402
 
 
