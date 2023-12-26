@@ -24,7 +24,6 @@ dependencies = [
     "Brotli>=1.1",
     "pydantic>=2.4",
     "pymongo>=4.6",
-    "ruff>=0.1.9",
     "pyutils @ git+https://github.com/Jylpah/pyutils.git@main-1.0",
 ]
 
@@ -38,6 +37,7 @@ dev = [
     "pytest-datafiles",
     "pytest-cov>=4.1",
     "pytest-timeout",
+    "ruff>=0.1.9",
     "types-aiofiles>=23.1",
 ]
 
