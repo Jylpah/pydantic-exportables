@@ -83,6 +83,20 @@ class JSONParent(JSONExportable, Importable):
         return {"name": self.index}
 
 
+class JSONAdult(JSONExportable):
+    name: str
+    age: int = Field(default=40)
+    child: JSONChild | None = Field(default=None)
+
+    def transform2JSONParent(self) -> JSONParent:
+        return JSONParent(
+            name=self.name, amount=self.age, correct=True, child=self.child
+        )
+
+
+JSONParent.register_transformation(JSONAdult, JSONAdult.transform2JSONParent)
+
+
 def today() -> datetime:
     return datetime.combine(date.today(), datetime.min.time())
 
@@ -174,6 +188,14 @@ def json_data() -> List[JSONParent]:
     res.append(JSONParent(name="P1", amount=1, array=["one", "two"], child=c1))
     res.append(JSONParent(name="P2", amount=-6, array=["three", "four"]))
     res.append(JSONParent(name="P3", amount=-6, child=c3))
+    return res
+
+
+@pytest.fixture
+def json_adults() -> List[JSONAdult]:
+    res: List[JSONAdult] = list()
+    res.append(JSONAdult(name="Alice", age=35, child=None))
+    res.append(JSONAdult(name="Bob", age=38, child=JSONChild(name="Ted")))
     return res
 
 
@@ -311,17 +333,33 @@ async def test_2_json_exportable_include_exclude() -> None:
                 incl in parent_db
             ), f"json_db() failed: included field {incl} excluded"
 
-    parent_src = json.loads(parent.json_src(fields=["name", "array"]))
+    parent_src = parent.obj_src(fields=["name", "array"])
     assert (
         "amount" not in parent_src
     ), "json_src() failed: excluded field 'amount' included"
     assert "array" in parent_src, "json_src() failed: included field 'array' excluded"
 
-    parent_db = json.loads(parent.json_db(fields=["name", "array"]))
+    parent_db = parent.obj_db(fields=["name", "array"])
     assert (
         "amount" not in parent_db
     ), "json_db() failed: excluded field 'amount' included"
     assert "array" in parent_db, "json_db() failed: included field 'array' excluded"
+
+    parent_src = parent.obj_src()
+    assert (
+        parent_new := JSONParent.from_obj(parent_src)
+    ) is not None, "could not create object from exported model"
+    assert (
+        parent == parent_new
+    ), f"re-created object is different to original: {parent_new}"
+
+    parent_db = parent.obj_db()
+    assert (
+        parent_new := JSONParent.from_obj(parent_db)
+    ) is not None, "could not create object from exported model"
+    assert (
+        parent == parent_new
+    ), f"re-created object is different to original: {parent_new}"
 
 
 def test_3_jsonexportable_update(json_data: List[JSONParent]):
@@ -364,8 +402,15 @@ def test_3_jsonexportable_update(json_data: List[JSONParent]):
     ), f"update() failed: updated={str(p)}"
 
 
+def test_4_jsonexportable_transform(json_adults: List[JSONAdult]):
+    res = JSONParent.transform_many(json_adults)
+    assert len(res) == len(
+        json_adults
+    ), f"could not transform all data: {len(res)} != {len(json_adults)}"
+
+
 @pytest.mark.asyncio
-async def test_4_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
+async def test_5_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
     fn: Path = tmp_path / "export.txt"
 
     await export(awrap(txt_data), "txt", filename="-")  # type: ignore
@@ -395,7 +440,7 @@ async def test_4_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPer
 
 
 @pytest.mark.asyncio
-async def test_5_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
+async def test_6_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
     fn: Path = tmp_path / "export.csv"
 
     await export(awrap(csv_data), "csv", filename="-")  # type: ignore
