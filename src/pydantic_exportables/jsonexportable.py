@@ -43,9 +43,9 @@ DESCENDING: Literal[-1] = -1
 ASCENDING: Literal[1] = 1
 TEXT: Literal["text"] = "text"
 
-Idx = Union[str, int, ObjectId]
-BackendIndexType = Literal[-1, 1, "text"]
-BackendIndex = tuple[str, BackendIndexType]
+Idx = Union[str, int, PyObjectId]
+IndexSortOrder = Literal[-1, 1, "text"]
+BackendIndex = tuple[str, IndexSortOrder]
 IdxType = TypeVar("IdxType", bound=Idx)
 
 
@@ -242,7 +242,7 @@ class JSONExportable(BaseModel):
         raise NotImplementedError
 
     @classmethod
-    def backend_indexes(cls) -> list[list[tuple[str, BackendIndexType]]]:
+    def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
         """return backend search indexes"""
         raise NotImplementedError
 
