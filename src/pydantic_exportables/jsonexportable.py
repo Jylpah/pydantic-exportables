@@ -462,10 +462,46 @@ class JSONExportableRootDict(
         added, updated = self.update_items(new=new, match_index=match_index)
         return len(added) > 0 or len(updated) > 0
 
+    def model_dump(  # type: ignore
+        self,
+        *,
+        mode: str = "python",
+        include: Any = None,
+        exclude: Any = None,
+        by_alias: bool = False,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        round_trip: bool = False,
+        warnings: bool = True,
+    ) -> Dict[str | int, Any]:
+        res: Dict[str | int, Any] = dict()
+        for key, value in self.items():
+            _key: str | int
+            if isinstance(key, ObjectId):
+                _key = str(key)
+            else:
+                _key = key
+            res[_key] = value.model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+            )
+        return res
+
 
 # class Map(JSONExportable):
 #     name: str
 #     code: PyObjectId
+#     id: int = Field(default=2)
+
+#     _exclude_defaults = True
 
 #     @property
 #     def index(self) -> PyObjectId:
@@ -484,10 +520,10 @@ class JSONExportableRootDict(
 # maps = Maps()
 
 # for i in range(5):
-#     maps.add(Map(name=f"test {i}", code=ObjectId()))
+#     maps.add(Map(name=f"test {i}", code=ObjectId(), id=i))
 
 
-# print(maps)
+# print(maps.json_db())
 
 
 # class TestClass(JSONExportable):
