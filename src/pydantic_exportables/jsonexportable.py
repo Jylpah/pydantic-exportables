@@ -419,8 +419,11 @@ class JSONExportableRootDict(
     def keys(self) -> KeysView[Idx]:
         return self.root.keys()
 
-    def __contains__(self, item: JSONExportableType) -> bool:
-        return item.index in self.root
+    def __contains__(self, item: JSONExportableType | Idx) -> bool:
+        if isinstance(item, JSONExportable):
+            return item.index in self.root
+        else:
+            return item in self.root
 
     def items(self) -> ItemsView[Idx, JSONExportableType]:
         """Provide dict like functionality"""
