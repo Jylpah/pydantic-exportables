@@ -17,21 +17,45 @@ from typing import (
     Callable,
     Sequence,
     AsyncGenerator,
+    Annotated,
 )
 from pathlib import Path
 from collections.abc import MutableMapping
-from pydantic import BaseModel, ValidationError, ConfigDict
+from pydantic import (
+    BaseModel,
+    RootModel,
+    ValidationError,
+    ConfigDict,
+    Field,
+    InstanceOf,
+    PlainSerializer,
+    AfterValidator,
+    WithJsonSchema,
+)
 from aiofiles import open
 from bson.objectid import ObjectId
 
 from pyutils.utils import str2path
 
-# Setup logging
-logger = logging.getLogger()
-error = logger.error
-message = logger.warning
-verbose = logger.info
-debug = logger.debug
+
+# BaseModel.model_config["json_encoders"] = {ObjectId: lambda v: str(v)}
+
+
+def validate_object_id(v: Any) -> ObjectId:
+    if isinstance(v, ObjectId):
+        return v
+    if ObjectId.is_valid(v):
+        return ObjectId(v)
+    raise ValueError("Invalid ObjectId")
+
+
+PyObjectId = Annotated[
+    InstanceOf[ObjectId],
+    # Union[str, ObjectId],
+    AfterValidator(validate_object_id),
+    PlainSerializer(lambda x: str(x), return_type=str),
+    WithJsonSchema({"type": "string"}, mode="serialization"),
+]
 
 TypeExcludeDict = MutableMapping[int | str, Any]
 
