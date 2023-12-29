@@ -23,7 +23,7 @@ from typing import (
     Annotated,
 )
 
-from collections.abc import ItemsView, ValuesView
+from collections.abc import ItemsView, ValuesView, KeysView
 from pathlib import Path
 from collections.abc import MutableMapping
 from pydantic import (
@@ -408,10 +408,16 @@ class JSONExportableRootDict(
         return len(self.root)
 
     def __iter__(self):
-        return iter([key for key, _ in sorted(self.root.items())])
+        if self._sorted:
+            return iter([key for key in sorted(self.keys())])
+        else:
+            return iter([key for key in self.keys()])
 
     def values(self) -> ValuesView[JSONExportableType]:
         return self.root.values()
+
+    def keys(self) -> KeysView[Idx]:
+        return self.root.keys()
 
     def __contains__(self, item: JSONExportableType) -> bool:
         return item.index in self.root
