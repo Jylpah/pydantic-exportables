@@ -108,7 +108,6 @@ class JSONExportable(BaseModel):
         validate_assignment=True,
         populate_by_name=True,
         from_attributes=True,
-        arbitrary_types_allowed=True,
     )
 
     # This is set in every subclass using __init_subclass__()
@@ -387,7 +386,6 @@ class JSONExportableRootDict(
         validate_assignment=True,
         populate_by_name=True,
         from_attributes=True,
-        arbitrary_types_allowed=True,
     )
 
     def add(self, item: JSONExportableType) -> None:
@@ -471,7 +469,6 @@ class JSONExportableRootDict(
 #         validate_assignment=True,
 #         populate_by_name=True,
 #         from_attributes=True,
-#         arbitrary_types_allowed=True,
 #     )
 
 
