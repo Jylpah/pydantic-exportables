@@ -442,6 +442,8 @@ def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
     assert family.update(family2), "update() failed"
     assert family["Mick"] == parent, "__get_item__() failed"
     if parent in family:
+        pass
+    if "Mick" in family:
         del family["Mick"]
     else:
         assert False, "item 'Mick' not found in family even it should"
