@@ -3,6 +3,7 @@ from .jsonexportable import (
     JSONExportable as JSONExportable,
     JSONExportableRootDict as JSONExportableRootDict,
     PyObjectId as PyObjectId,
+    validate_object_id as validate_object_id,
     TypeExcludeDict as TypeExcludeDict,
     IndexSortOrder as IndexSortOrder,
     BackendIndex as BackendIndex,
