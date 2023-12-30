@@ -22,7 +22,7 @@ from typing import (
     AsyncGenerator,
     Annotated,
 )
-
+import json
 from collections.abc import ItemsView, ValuesView, KeysView
 from pathlib import Path
 from collections.abc import MutableMapping
@@ -214,7 +214,9 @@ class JSONExportable(BaseModel):
     def parse_str(cls, content: str) -> Self | None:
         """return class instance from a JSON string"""
         try:
-            return cls.model_validate_json(content)
+            ## WORKAROUND for https://github.com/pydantic/pydantic/issues/8189#issuecomment-1823465499
+            # return cls.model_validate_json(content)
+            return cls.model_validate(json.loads(content))
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
