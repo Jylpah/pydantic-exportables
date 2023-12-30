@@ -3,7 +3,10 @@ import pytest  # type: ignore
 from bson import ObjectId
 from typing import List
 
-from pydantic_exportables import PyObjectId, validate_object_id
+from pydantic_exportables import (
+    PyObjectId,
+    validate_object_id,
+)
 
 
 @pytest.fixture
