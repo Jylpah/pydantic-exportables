@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-exportables"
-version = "1.0.4"
+version = "1.1.0a1"
 authors = [{ name = "Jylpah", email = "jylpah@gmail.com" }]
 description = "Python Pydantic BaseModel extension and helpers for easier import/export to different formats (JSON, CSV, TXT)"
 readme = "README.md"
@@ -67,6 +67,7 @@ mypy_path = ['src']
 include = ["pyproject.toml", "src/**/*.py", "tests/**/*.py"]
 indent-width = 4
 extend-include = ["*.ipynb"]
+extend-exclude = [".venv", ".vscode" ] 
 fixable = ["ALL"]
 
 [tool.pytest.ini_options]

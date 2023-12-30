@@ -9,29 +9,57 @@ from typing import (
     Optional,
     Type,
     Any,
+    Dict,
+    Tuple,
     Self,
     Literal,
     TypeVar,
     ClassVar,
     Union,
+    Generic,
     Callable,
     Sequence,
     AsyncGenerator,
+    Annotated,
 )
+import json
+from collections.abc import ItemsView, ValuesView, KeysView
 from pathlib import Path
 from collections.abc import MutableMapping
-from pydantic import BaseModel, ValidationError, ConfigDict
+from pydantic import (
+    BaseModel,
+    RootModel,
+    ValidationError,
+    ConfigDict,
+    Field,
+    InstanceOf,
+    PlainSerializer,
+    AfterValidator,
+    WithJsonSchema,
+)
 from aiofiles import open
 from bson.objectid import ObjectId
-
 from pyutils.utils import str2path
 
-# Setup logging
-logger = logging.getLogger()
-error = logger.error
-message = logger.warning
-verbose = logger.info
-debug = logger.debug
+
+# BaseModel.model_config["json_encoders"] = {ObjectId: lambda v: str(v)}
+
+
+def validate_object_id(v: Any) -> ObjectId:
+    if isinstance(v, ObjectId):
+        return v
+    if ObjectId.is_valid(v):
+        return ObjectId(v)
+    raise ValueError("Invalid ObjectId")
+
+
+PyObjectId = Annotated[
+    InstanceOf[ObjectId],
+    # Union[str, ObjectId],
+    AfterValidator(validate_object_id),
+    PlainSerializer(lambda x: str(x), return_type=str),
+    WithJsonSchema({"type": "string"}, mode="serialization"),
+]
 
 TypeExcludeDict = MutableMapping[int | str, Any]
 
@@ -43,10 +71,19 @@ DESCENDING: Literal[-1] = -1
 ASCENDING: Literal[1] = 1
 TEXT: Literal["text"] = "text"
 
-Idx = Union[str, int, ObjectId]
-BackendIndexType = Literal[-1, 1, "text"]
-BackendIndex = tuple[str, BackendIndexType]
+Idx = Union[str, int, PyObjectId]
+IndexSortOrder = Literal[-1, 1, "text"]
+BackendIndex = tuple[str, IndexSortOrder]
 IdxType = TypeVar("IdxType", bound=Idx)
+
+JSONExportableType = TypeVar("JSONExportableType", bound="JSONExportable")
+
+# Setup logging
+logger = logging.getLogger()
+error = logger.error
+message = logger.warning
+verbose = logger.info
+debug = logger.debug
 
 
 class JSONExportable(BaseModel):
@@ -177,7 +214,9 @@ class JSONExportable(BaseModel):
     def parse_str(cls, content: str) -> Self | None:
         """return class instance from a JSON string"""
         try:
-            return cls.model_validate_json(content)
+            ## WORKAROUND for https://github.com/pydantic/pydantic/issues/8189#issuecomment-1823465499
+            # return cls.model_validate_json(content)
+            return cls.model_validate(json.loads(content))
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
@@ -221,13 +260,6 @@ class JSONExportable(BaseModel):
                 del kwargs["include"]
             except Exception:
                 pass
-        # else:
-        #     for f in ["exclude", "include"]:
-        #         try:
-        #             params[f].update(kwargs[f])
-        #             del kwargs[f]
-        #         except:
-        #             pass
         params.update(kwargs)
         return params
 
@@ -242,7 +274,7 @@ class JSONExportable(BaseModel):
         raise NotImplementedError
 
     @classmethod
-    def backend_indexes(cls) -> list[list[tuple[str, BackendIndexType]]]:
+    def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
         """return backend search indexes"""
         raise NotImplementedError
 
@@ -338,3 +370,163 @@ class JSONExportable(BaseModel):
             updated = True
 
         return updated
+
+
+class JSONExportableRootDict(
+    RootModel[Dict[Idx, JSONExportableType]],
+    JSONExportable,
+    Generic[JSONExportableType],
+):
+    """Pydantic RootModel baseclass for JSONExportable"""
+
+    root: Annotated[Dict[Idx, JSONExportableType], Field(default_factory=dict)] = dict()
+
+    _sorted: bool = True  # sort items
+
+    model_config = ConfigDict(
+        frozen=False,
+        validate_assignment=True,
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
+    def add(self, item: JSONExportableType) -> None:
+        self.root[item.index] = item
+
+    def __setitem__(self, key: Idx, item: JSONExportableType) -> None:
+        """Implement setter"""
+        self.root[item.index] = item
+
+    def __getitem__(self, key: Idx) -> JSONExportableType:
+        """Implement getter"""
+        return self.root[key]
+
+    def __delitem__(self, key: Idx) -> None:
+        """Delete item with key"""
+        del self.root[key]
+
+    def __len__(self) -> int:
+        """Return the number of items"""
+        return len(self.root)
+
+    def __iter__(self):
+        if self._sorted:
+            return iter([key for key in sorted(self.keys())])
+        else:
+            return iter([key for key in self.keys()])
+
+    def values(self) -> ValuesView[JSONExportableType]:
+        return self.root.values()
+
+    def keys(self) -> KeysView[Idx]:
+        return self.root.keys()
+
+    def __contains__(self, item: JSONExportableType | Idx) -> bool:
+        if isinstance(item, JSONExportable):
+            return item.index in self.root
+        else:
+            return item in self.root
+
+    def items(self) -> ItemsView[Idx, JSONExportableType]:
+        """Provide dict like functionality"""
+        return self.root.items()
+
+    def update_items(
+        self, new: Self, match_index: bool = True
+    ) -> Tuple[set[Idx], set[Idx]]:
+        """
+        update items from with 'new'. Ignore default values.
+        By default matches only instance with the same index.
+        """
+        new_ids: set[Idx] = {key for key in new}
+        old_ids: set[Idx] = {key for key in self}
+        added: set[Idx] = new_ids - old_ids
+        updated: set[Idx] = new_ids & old_ids
+
+        updated = {key for key in updated if new[key] != self[key]}
+        updated_idx: set[Idx] = set()
+        for key in updated:
+            self[key].update(new=new[key], match_index=match_index)
+            updated_idx.add(key)
+
+        for key in added:
+            self.root[key] = new[key]
+
+        return (added, updated_idx)
+
+    def update(self, new: Self, match_index: bool = True) -> bool:
+        """
+        update() with JSONExportable.update() signature. Calls update_items()
+        and returns True if an update was made
+        """
+        added: set[Idx]
+        updated: set[Idx]
+        added, updated = self.update_items(new=new, match_index=match_index)
+        return len(added) > 0 or len(updated) > 0
+
+    def model_dump(  # type: ignore
+        self,
+        *,
+        mode: str = "python",
+        include: Any = None,
+        exclude: Any = None,
+        by_alias: bool = False,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        round_trip: bool = False,
+        warnings: bool = True,
+    ) -> Dict[str | int, Any]:
+        res: Dict[str | int, Any] = dict()
+        for key, value in self.items():
+            _key: str | int
+            if isinstance(key, ObjectId):
+                _key = str(key)
+            else:
+                _key = key
+            res[_key] = value.model_dump(
+                mode=mode,
+                include=include,
+                exclude=exclude,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                round_trip=round_trip,
+                warnings=warnings,
+            )
+        return res
+
+
+# class Map(JSONExportable):
+#     name: str
+#     code: PyObjectId
+#     id: int = Field(default=2)
+
+#     _exclude_defaults = True
+
+#     @property
+#     def index(self) -> PyObjectId:
+#         return self.code
+
+
+# class Maps(JSONExportableRootDict[Map]):
+#     model_config = ConfigDict(
+#         frozen=False,
+#         validate_assignment=True,
+#         populate_by_name=True,
+#         from_attributes=True,
+#     )
+
+
+# maps = Maps()
+
+# for i in range(5):
+#     maps.add(Map(name=f"test {i}", code=ObjectId(), id=i))
+
+
+# print(maps.json_db())
+
+
+# class TestClass(JSONExportable):
+#     data: Maps = Field(default_factory=Maps)
