@@ -295,6 +295,17 @@ async def test_1_json_exportable(tmp_path: Path, json_parents: List[JSONParent])
 
     assert len(imported) == 0, "Export or import failed"
 
+    for parent in json_parents:
+        assert (
+            await parent.save_json(fn) > 0
+        ), f"could not save JSONExportable: {str(parent)}"
+        assert (
+            parent_imported := await JSONParent.open_json(fn)
+        ) is not None, f"could not import save json: {str(parent)}"
+        assert (
+            parent == parent_imported
+        ), f"imported data does not match original: original={parent}, imported={parent_imported}"
+
 
 @pytest.mark.asyncio
 async def test_2_json_exportable_include_exclude() -> None:
@@ -405,12 +416,31 @@ def test_3_jsonexportable_update(json_parents: List[JSONParent]):
 
 def test_4_jsonexportable_transform(json_adults: List[JSONAdult]):
     res = JSONParent.transform_many(json_adults)
-    assert len(res) == len(
-        json_adults
-    ), f"could not transform all data: {len(res)} != {len(json_adults)}"
+    N: int = len(json_adults)
+    assert len(res) == N, f"could not transform all data: {len(res)} != {N}"
+
+    res2 = JSONAdult.transform_many(json_adults)
+    assert len(res2) == N, f"could not transform all data: {len(res)} != {N}"
+
+    res3 = JSONParent.from_objs(
+        [adult.model_dump() for adult in json_adults], in_type=JSONAdult
+    )
+    assert len(res3) == N, f"from_objs(in_type=JSONAdult) failed: {len(res)} != {N}"
 
 
-def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
+def test_5_jsonexportable_transform_fails(json_parents: List[JSONParent]):
+    res = JSONAdult.transform_many(json_parents)
+    assert len(res) == 0, f"transform data it should have not: {len(res)} != 0"
+
+    res2 = JSONChild.from_objs(
+        [parent.model_dump() for parent in json_parents], in_type=JSONAdult
+    )
+    assert (
+        len(res2) == 0
+    ), f"from_objs() returned data when it should have not: {len(res)} != 0"
+
+
+def test_6_jsonexportablerootdict(json_parents: List[JSONParent]):
     family = JSONNeighbours()
     for parent in json_parents:
         family.add(parent)
@@ -466,7 +496,7 @@ def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
 
 
 @pytest.mark.asyncio
-async def test_5_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
+async def test_7_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
     fn: Path = tmp_path / "export.txt"
 
     await export(awrap(txt_data), "txt", filename="-")  # type: ignore
@@ -496,7 +526,7 @@ async def test_5_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPer
 
 
 @pytest.mark.asyncio
-async def test_6_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
+async def test_8_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
     fn: Path = tmp_path / "export.csv"
 
     await export(awrap(csv_data), "csv", filename="-")  # type: ignore
