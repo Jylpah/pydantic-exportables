@@ -216,7 +216,7 @@ class JSONExportable(BaseModel):
         try:
             ## WORKAROUND for https://github.com/pydantic/pydantic/issues/8189#issuecomment-1823465499
             # return cls.model_validate_json(content)
-            return cls.model_validate(json.loads(content))
+            return cls.model_validate(json.loads(content), strict=True)
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
@@ -375,7 +375,7 @@ class JSONExportable(BaseModel):
 
 class JSONExportableRootDict(
     RootModel[Dict[Idx, JSONExportableType]],
-    JSONExportable,
+    # JSONExportable,
     Generic[JSONExportableType],
 ):
     """Pydantic RootModel baseclass for JSONExportable"""
@@ -432,9 +432,7 @@ class JSONExportableRootDict(
         """Provide dict like functionality"""
         return self.root.items()
 
-    def update_items(
-        self, new: Self, match_index: bool = True
-    ) -> Tuple[set[Idx], set[Idx]]:
+    def update(self, new: Self, match_index: bool = True) -> Tuple[set[Idx], set[Idx]]:
         """
         update items from with 'new'. Ignore default values.
         By default matches only instance with the same index.
@@ -455,48 +453,143 @@ class JSONExportableRootDict(
 
         return (added, updated_idx)
 
-    def update(self, new: Self, match_index: bool = True) -> bool:
-        """
-        update() with JSONExportable.update() signature. Calls update_items()
-        and returns True if an update was made
-        """
-        added: set[Idx]
-        updated: set[Idx]
-        added, updated = self.update_items(new=new, match_index=match_index)
-        return len(added) > 0 or len(updated) > 0
+    # def update(self, new: Self, match_index: bool = True) -> bool:
+    #     """
+    #     update() with JSONExportable.update() signature. Calls update_items()
+    #     and returns True if an update was made
+    #     """
+    #     added: set[Idx]
+    #     updated: set[Idx]
+    #     added, updated = self.update_items(new=new, match_index=match_index)
+    #     return len(added) > 0 or len(updated) > 0
 
-    def model_dump(  # type: ignore
-        self,
-        *,
-        mode: str = "python",
-        include: Any = None,
-        exclude: Any = None,
-        by_alias: bool = False,
-        exclude_unset: bool = False,
-        exclude_defaults: bool = False,
-        exclude_none: bool = False,
-        round_trip: bool = False,
-        warnings: bool = True,
-    ) -> Dict[str | int, Any]:
+    def json_src(self, **kwargs) -> str:
+        """ """
+        return (
+            "{"
+            + ",\n".join(
+                [
+                    f'"{str(key)}": {value.json_src(**kwargs)}'
+                    for key, value in self.items()
+                ]
+            )
+            + "}"
+        )
+
+    def json_db(self, **kwargs) -> str:
+        """ """
+        return (
+            "{"
+            + ",\n".join(
+                [
+                    f'"{str(key)}": {value.json_db(**kwargs)}'
+                    for key, value in self.items()
+                ]
+            )
+            + "}"
+        )
+
+    def obj_db(self, **kwargs) -> Dict[str | int, Any]:
         res: Dict[str | int, Any] = dict()
         for key, value in self.items():
-            _key: str | int
             if isinstance(key, ObjectId):
-                _key = str(key)
-            else:
-                _key = key
-            res[_key] = value.model_dump(
-                mode=mode,
-                include=include,
-                exclude=exclude,
-                by_alias=by_alias,
-                exclude_unset=exclude_unset,
-                exclude_defaults=exclude_defaults,
-                exclude_none=exclude_none,
-                round_trip=round_trip,
-                warnings=warnings,
-            )
+                key = str(key)
+            res[key] = value.obj_db(**kwargs)
         return res
+
+    def obj_src(self, **kwargs) -> Dict[str | int, Any]:
+        res: Dict[str | int, Any] = dict()
+        for key, value in self.items():
+            if isinstance(key, ObjectId):
+                key = str(key)
+            res[key] = value.obj_src(**kwargs)
+        return res
+
+    @classmethod
+    def from_obj(cls, obj: Any) -> Optional[Self]:
+        """Parse instance from raw object.
+        Returns None if reading from object failed.
+        """
+        try:
+            return cls.model_validate(obj)
+        except ValidationError as err:
+            error("could not parse object as %s: %s", cls.__name__, str(err))
+        return None
+
+    async def save_json(self, filename: Path | str) -> int:
+        """Save object as JSON into a file"""
+        filename = str2path(filename)
+
+        try:
+            if not filename.name.endswith(".json"):
+                filename = filename.with_suffix(".json")
+            async with open(filename, mode="w", encoding="utf-8") as rf:
+                return await rf.write(self.json_src())
+        except Exception as err:
+            error(f"Error writing file {filename}: {err}")
+        return -1
+
+    @classmethod
+    async def open_json(
+        cls, filename: Path | str, exceptions: bool = False
+    ) -> Self | None:
+        """Open replay JSON file and return class instance"""
+        try:
+            async with open(filename, "r") as f:
+                return cls.model_validate_json(await f.read())
+        except ValueError as err:
+            debug(f"Could not parse {type(cls)} from file: {filename}: {err}")
+            if exceptions:
+                raise
+        except OSError as err:
+            debug(f"Error reading file: {filename}: {err}")
+            if exceptions:
+                raise
+        return None
+
+    @classmethod
+    def parse_str(cls, content: str) -> Self | None:
+        """return class instance from a JSON string"""
+        try:
+            ## WORKAROUND for https://github.com/pydantic/pydantic/issues/8189#issuecomment-1823465499
+            # return cls.model_validate_json(content)
+            return cls.model_validate(json.loads(content), strict=True)
+        except ValueError as err:
+            debug(f"Could not parse {type(cls)} from JSON: {err}")
+        return None
+
+    # def model_dump(  # type: ignore
+    #     self,
+    #     *,
+    #     mode: str = "python",
+    #     include: Any = None,
+    #     exclude: Any = None,
+    #     by_alias: bool = False,
+    #     exclude_unset: bool = False,
+    #     exclude_defaults: bool = False,
+    #     exclude_none: bool = False,
+    #     round_trip: bool = False,
+    #     warnings: bool = True,
+    # ) -> Dict[str | int, Any]:
+    #     res: Dict[str | int, Any] = dict()
+    #     for key, value in self.items():
+    #         _key: str | int
+    #         if isinstance(key, ObjectId):
+    #             _key = str(key)
+    #         else:
+    #             _key = key
+    #         res[_key] = value.model_dump(
+    #             mode=mode,
+    #             include=include,
+    #             exclude=exclude,
+    #             by_alias=by_alias,
+    #             exclude_unset=exclude_unset,
+    #             exclude_defaults=exclude_defaults,
+    #             exclude_none=exclude_none,
+    #             round_trip=round_trip,
+    #             warnings=warnings,
+    #         )
+    #     return res
 
 
 # class Map(JSONExportable):
