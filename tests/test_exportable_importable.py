@@ -1,5 +1,5 @@
 import pytest  # type: ignore
-from typing import Self, List
+from typing import Self, List, Annotated
 from pydantic import Field
 from pathlib import Path
 from datetime import date, datetime
@@ -8,6 +8,7 @@ import json
 import logging
 from pydantic_exportables import (
     JSONExportable,
+    JSONExportableRootDict,
     export,
     Idx,
     CSVExportable,
@@ -50,7 +51,7 @@ class Hair(IntEnum):
 
 class JSONChild(JSONExportable):
     name: str
-    created: int = Field(default_factory=epoch_now)
+    born: int = Field(default_factory=epoch_now)
 
     @property
     def index(self) -> Idx:
@@ -65,8 +66,8 @@ class JSONChild(JSONExportable):
 
 class JSONParent(JSONExportable, Importable):
     name: str
-    amount: int = 0
-    correct: bool = Field(default=False, alias="c")
+    years: int = 37
+    married: bool = Field(default=True, alias="m")
     array: List[str] = Field(default_factory=list)
     child: JSONChild | None = Field(default=None)
 
@@ -86,12 +87,16 @@ class JSONParent(JSONExportable, Importable):
 class JSONAdult(JSONExportable):
     name: str
     age: int = Field(default=40)
-    child: JSONChild | None = Field(default=None)
+    married: Annotated[bool, Field(default=False)] = False
 
     def transform2JSONParent(self) -> JSONParent:
         return JSONParent(
-            name=self.name, amount=self.age, correct=True, child=self.child
+            name=self.name, years=self.age, married=self.married, child=None
         )
+
+
+class JSONNeighbours(JSONExportableRootDict[JSONParent]):
+    pass
 
 
 JSONParent.register_transformation(JSONAdult, JSONAdult.transform2JSONParent)
@@ -181,13 +186,13 @@ class CSVChild(CSVPerson):
 
 
 @pytest.fixture
-def json_data() -> List[JSONParent]:
+def json_parents() -> List[JSONParent]:
     c1 = JSONChild(name="c1")
     c3 = JSONChild(name="c3")
     res: List[JSONParent] = list()
-    res.append(JSONParent(name="P1", amount=1, array=["one", "two"], child=c1))
-    res.append(JSONParent(name="P2", amount=-6, array=["three", "four"]))
-    res.append(JSONParent(name="P3", amount=-6, child=c3))
+    res.append(JSONParent(name="Erik", years=1, array=["one", "two"], child=c1))
+    res.append(JSONParent(name="Mia", years=-6, array=["three", "four"]))
+    res.append(JSONParent(name="Jack", years=-6, child=c3))
     return res
 
 
@@ -266,13 +271,13 @@ def txt_data() -> List[TXTPerson]:
 
 
 @pytest.mark.asyncio
-async def test_1_json_exportable(tmp_path: Path, json_data: List[JSONParent]):
+async def test_1_json_exportable(tmp_path: Path, json_parents: List[JSONParent]):
     fn: Path = tmp_path / "export.json"
 
-    await export(awrap(json_data), format="json", filename="-")  # type: ignore
-    await export(awrap(json_data), format="json", filename=fn)  # type: ignore
+    await export(awrap(json_parents), format="json", filename="-")  # type: ignore
+    await export(awrap(json_parents), format="json", filename=fn)  # type: ignore
     await export(
-        awrap(json_data), format="json", filename=str(fn.resolve()), force=True
+        awrap(json_parents), format="json", filename=str(fn.resolve()), force=True
     )  # type: ignore
 
     imported: set[JSONParent] = set()
@@ -282,7 +287,7 @@ async def test_1_json_exportable(tmp_path: Path, json_data: List[JSONParent]):
     except Exception as err:
         assert False, f"failed to import test data: {err}"
 
-    for data in json_data:
+    for data in json_parents:
         try:
             imported.remove(data)
         except Exception as err:
@@ -294,9 +299,7 @@ async def test_1_json_exportable(tmp_path: Path, json_data: List[JSONParent]):
 @pytest.mark.asyncio
 async def test_2_json_exportable_include_exclude() -> None:
     # test for custom include/exclude
-    parent = JSONParent(
-        name="P3", amount=-6, correct=False, child=JSONChild(name="test")
-    )
+    parent = JSONParent(name="P3", years=-6, married=True, child=JSONChild(name="test"))
 
     parent_src: dict
     parent_db: dict
@@ -306,7 +309,7 @@ async def test_2_json_exportable_include_exclude() -> None:
     ), "json_src() failed: _exclude_unset set 'False', 'array' excluded"
     parent_db = json.loads(parent.json_db())
     assert (
-        "c" not in parent_db
+        "m" not in parent_db
     ), "json_db() failed: _exclude_defaults set 'True', 'c' included"
 
     for excl, incl in zip(["child", None], ["name", None]):
@@ -335,14 +338,12 @@ async def test_2_json_exportable_include_exclude() -> None:
 
     parent_src = parent.obj_src(fields=["name", "array"])
     assert (
-        "amount" not in parent_src
-    ), "json_src() failed: excluded field 'amount' included"
+        "years" not in parent_src
+    ), "json_src() failed: excluded field 'years' included"
     assert "array" in parent_src, "json_src() failed: included field 'array' excluded"
 
     parent_db = parent.obj_db(fields=["name", "array"])
-    assert (
-        "amount" not in parent_db
-    ), "json_db() failed: excluded field 'amount' included"
+    assert "years" not in parent_db, "json_db() failed: excluded field 'years' included"
     assert "array" in parent_db, "json_db() failed: included field 'array' excluded"
 
     parent_src = parent.obj_src()
@@ -362,17 +363,17 @@ async def test_2_json_exportable_include_exclude() -> None:
     ), f"re-created object is different to original: {parent_new}"
 
 
-def test_3_jsonexportable_update(json_data: List[JSONParent]):
+def test_3_jsonexportable_update(json_parents: List[JSONParent]):
     """
     test for JSONExportable.update()
     """
-    p0: JSONParent = json_data[0]
-    p1: JSONParent = json_data[1]
-    p2: JSONParent = json_data[2]
+    p0: JSONParent = json_parents[0]
+    p1: JSONParent = json_parents[1]
+    p2: JSONParent = json_parents[2]
 
     p: JSONParent = p0.model_copy(deep=True)
 
-    for new in json_data[1:]:
+    for new in json_parents[1:]:
         assert not p.update(
             new, match_index=True
         ), "update succeeded even the indexes do not match"
@@ -382,8 +383,8 @@ def test_3_jsonexportable_update(json_data: List[JSONParent]):
     assert all(
         [
             p.name == p1.name,
-            p.amount == p1.amount,
-            p.correct == p1.correct,
+            p.years == p1.years,
+            p.married == p1.married,
             p.array == p1.array,
             p.child == p0.child,
         ]
@@ -394,8 +395,8 @@ def test_3_jsonexportable_update(json_data: List[JSONParent]):
     assert all(
         [
             p.name == p2.name,
-            p.amount == p2.amount,
-            p.correct == p2.correct,
+            p.years == p2.years,
+            p.married == p2.married,
             p.array == p1.array,
             p.child == p2.child,
         ]
@@ -407,6 +408,61 @@ def test_4_jsonexportable_transform(json_adults: List[JSONAdult]):
     assert len(res) == len(
         json_adults
     ), f"could not transform all data: {len(res)} != {len(json_adults)}"
+
+
+def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
+    family = JSONNeighbours()
+    for parent in json_parents:
+        family.add(parent)
+
+    assert len(family) == len(
+        json_parents
+    ), f"could not add all the list members: {family} != {len(json_parents)}"
+
+    family2 = JSONNeighbours()
+    parent = JSONParent(
+        name="Mick",
+        years=28,
+        child=None,
+    )
+    family2[parent.name] = parent
+    family2.add(
+        JSONParent(
+            name="Betty",
+            years=26,
+            child=JSONChild(
+                name="Elisabeth",
+                born=int(
+                    datetime(year=2009, month=6, day=4, hour=13, minute=56).timestamp()
+                ),
+            ),
+        )
+    )
+
+    assert family.update(family2), "update() failed"
+    assert family["Mick"] == parent, "__get_item__() failed"
+    if parent in family:
+        pass
+    if "Mick" in family:
+        del family["Mick"]
+    else:
+        assert False, "item 'Mick' not found in family even it should"
+
+    for name, parent in family.items():
+        assert name == parent.name, "wrong item returned"
+
+    assert len(family) == len(
+        family.values()
+    ), f"values() returned incorrect number of items: {len(family)} != {len(family.values())}"
+
+    assert (
+        _ := JSONNeighbours.from_obj(family.obj_db())
+    ) is not None, "could not recreate JSONExportableRootDict() from obj_db()"
+
+    debug(family.json_src())
+    assert (
+        _ := JSONNeighbours.parse_str(family.json_src())
+    ) is not None, "could not parse JSONExportableRootDict() from json_src()"
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,10 @@
 from .aliasmapper import AliasMapper as AliasMapper
 from .jsonexportable import (
     JSONExportable as JSONExportable,
+    JSONExportableRootDict as JSONExportableRootDict,
+    PyObjectId as PyObjectId,
     TypeExcludeDict as TypeExcludeDict,
-    BackendIndexType as BackendIndexType,
+    IndexSortOrder as IndexSortOrder,
     BackendIndex as BackendIndex,
     Idx as Idx,
     DESCENDING as DESCENDING,
