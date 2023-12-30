@@ -15,6 +15,7 @@ from pydantic_exportables import (
     TXTExportable,
     TXTImportable,
     Importable,
+    AliasMapper,
 )
 from pyutils import awrap
 from pyutils.utils import epoch_now
@@ -65,11 +66,11 @@ class JSONChild(JSONExportable):
 
 
 class JSONParent(JSONExportable, Importable):
-    name: str
-    years: int = 37
+    name: str = Field(alias="n")
+    years: int = Field(default=37, alias="y")
     married: bool = Field(default=True, alias="m")
-    array: List[str] = Field(default_factory=list)
-    child: JSONChild | None = Field(default=None)
+    array: List[str] = Field(default_factory=list, alias="a")
+    child: JSONChild | None = Field(default=None, alias="c")
 
     _exclude_unset = False
 
@@ -273,7 +274,9 @@ def txt_data() -> List[TXTPerson]:
 
 
 @pytest.mark.asyncio
-async def test_1_json_exportable(tmp_path: Path, json_parents: List[JSONParent]):
+async def test_1_json_exportable_import_save(
+    tmp_path: Path, json_parents: List[JSONParent]
+):
     fn: Path = tmp_path / "export.json"
 
     await export(awrap(json_parents), format="json", filename="-")  # type: ignore
@@ -307,13 +310,29 @@ async def test_1_json_exportable(tmp_path: Path, json_parents: List[JSONParent])
         assert (
             parent == parent_imported
         ), f"imported data does not match original: original={parent}, imported={parent_imported}"
+        assert (
+            adult := await JSONAdult.open_json(fn)
+        ) is None, f"open_json() returned instance even it should not: {adult}"
+
+    parent = json_parents[0]
+    assert (
+        await parent.save_json(fn.with_suffix("")) > 0
+    ), f"could not save JSONExportable: {str(parent)}"
+
+    # Test for opening non-existent file
+    assert (
+        adult := await JSONAdult.open_json(fn.with_suffix(".not-found.json"))
+    ) is None, f"open_json() returned instance from non-existent file: {adult}"
 
 
 @pytest.mark.asyncio
 async def test_2_json_exportable_include_exclude() -> None:
     # test for custom include/exclude
-    parent = JSONParent(name="P3", years=-6, married=True, child=JSONChild(name="test"))
+    parent = JSONParent(
+        name="Jack", years=26, married=True, child=JSONChild(name="Nick")
+    )
 
+    mapper = AliasMapper(JSONParent)
     parent_src: dict
     parent_db: dict
     parent_src = json.loads(parent.json_src())
@@ -336,7 +355,7 @@ async def test_2_json_exportable_include_exclude() -> None:
         parent_db = json.loads(parent.json_db(fields=None, **kwargs))
         if excl is not None:
             assert (
-                excl not in parent_db
+                mapper.alias(excl) not in parent_db
             ), f"json_src() failed: excluded field {excl} included"
             assert (
                 excl not in parent_src
@@ -346,7 +365,7 @@ async def test_2_json_exportable_include_exclude() -> None:
                 incl in parent_src
             ), f"json_src() failed: included field {incl} excluded"
             assert (
-                incl in parent_db
+                mapper.alias(incl) in parent_db
             ), f"json_db() failed: included field {incl} excluded"
 
     parent_src = parent.obj_src(fields=["name", "array"])
@@ -356,8 +375,12 @@ async def test_2_json_exportable_include_exclude() -> None:
     assert "array" in parent_src, "json_src() failed: included field 'array' excluded"
 
     parent_db = parent.obj_db(fields=["name", "array"])
-    assert "years" not in parent_db, "json_db() failed: excluded field 'years' included"
-    assert "array" in parent_db, "json_db() failed: included field 'array' excluded"
+    assert (
+        mapper.alias("years") not in parent_db
+    ), "json_db() failed: excluded field 'years' included"
+    assert (
+        mapper.alias("array") in parent_db
+    ), "json_db() failed: included field 'array' excluded"
 
     parent_src = parent.obj_src()
     assert (
@@ -374,6 +397,12 @@ async def test_2_json_exportable_include_exclude() -> None:
     assert (
         parent == parent_new
     ), f"re-created object is different to original: {parent_new}"
+
+    parent_fail = parent.obj_src()
+    del parent_fail["name"]
+    assert (
+        _ := JSONParent.from_obj(parent_fail)
+    ) is None, f"from_obj() return an instance from faulty data: {parent_fail}"
 
 
 def test_3_jsonexportable_update(json_parents: List[JSONParent]):

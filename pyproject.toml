@@ -78,6 +78,11 @@ filterwarnings = [
     'ignore:Inheritance class ThrottledClientSession from ClientSession is discouraged:DeprecationWarning',
 ]
 
+[tool.coverage.report]
+exclude_also = [
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+    ]
 
 [tool.pyright]
 reportGeneralTypeIssues = false
