@@ -248,18 +248,19 @@ class JSONExportable(BaseModel):
             params["exclude_defaults"] = False
             params["exclude_unset"] = False
             params["exclude_none"] = False
-        elif "exclude" in kwargs:
-            try:
-                params["exclude"].update(kwargs["exclude"])
-                del kwargs["exclude"]
-            except Exception:
-                pass
-        elif "include" in kwargs:
-            try:
-                params["include"].update(kwargs["include"])
-                del kwargs["include"]
-            except Exception:
-                pass
+        else:
+            if "exclude" in kwargs:
+                try:
+                    params["exclude"].update(kwargs["exclude"])
+                    del kwargs["exclude"]
+                except Exception as err:
+                    debug(f"'exclude' caused an error: {err}")
+            if "include" in kwargs:
+                try:
+                    params["include"].update(kwargs["include"])
+                    del kwargs["include"]
+                except Exception as err:
+                    debug(f"'include' caused an error: {err}")
         params.update(kwargs)
         return params
 
