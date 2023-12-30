@@ -455,6 +455,15 @@ def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
         family.values()
     ), f"values() returned incorrect number of items: {len(family)} != {len(family.values())}"
 
+    assert (
+        _ := JSONNeighbours.from_obj(family.obj_db())
+    ) is not None, "could not recreate JSONExportableRootDict() from obj_db()"
+
+    debug(family.json_src())
+    assert (
+        _ := JSONNeighbours.parse_str(family.json_src())
+    ) is not None, "could not parse JSONExportableRootDict() from json_src()"
+
 
 @pytest.mark.asyncio
 async def test_5_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
