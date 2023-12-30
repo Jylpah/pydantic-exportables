@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-exportables"
-version = "1.0.4"
+version = "1.1.0a1"
 authors = [{ name = "Jylpah", email = "jylpah@gmail.com" }]
 description = "Python Pydantic BaseModel extension and helpers for easier import/export to different formats (JSON, CSV, TXT)"
 readme = "README.md"
