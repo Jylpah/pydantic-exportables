@@ -1,6 +1,6 @@
 import pytest  # type: ignore
 from typing import Self, List, Annotated
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from pathlib import Path
 from datetime import date, datetime
 from enum import StrEnum, IntEnum
@@ -88,6 +88,8 @@ class JSONAdult(JSONExportable):
     name: str
     age: int = Field(default=40)
     married: Annotated[bool, Field(default=False)] = False
+
+    model_config = ConfigDict(extra="forbid")
 
     def transform2JSONParent(self) -> JSONParent:
         return JSONParent(
@@ -199,8 +201,8 @@ def json_parents() -> List[JSONParent]:
 @pytest.fixture
 def json_adults() -> List[JSONAdult]:
     res: List[JSONAdult] = list()
-    res.append(JSONAdult(name="Alice", age=35, child=None))
-    res.append(JSONAdult(name="Bob", age=38, child=JSONChild(name="Ted")))
+    res.append(JSONAdult(name="Alice", age=35))
+    res.append(JSONAdult(name="Bob", age=38))
     return res
 
 
@@ -294,6 +296,17 @@ async def test_1_json_exportable(tmp_path: Path, json_parents: List[JSONParent])
             assert False, f"could not export or import item: {data}: {err}"
 
     assert len(imported) == 0, "Export or import failed"
+
+    for parent in json_parents:
+        assert (
+            await parent.save_json(fn) > 0
+        ), f"could not save JSONExportable: {str(parent)}"
+        assert (
+            parent_imported := await JSONParent.open_json(fn)
+        ) is not None, f"could not import save json: {str(parent)}"
+        assert (
+            parent == parent_imported
+        ), f"imported data does not match original: original={parent}, imported={parent_imported}"
 
 
 @pytest.mark.asyncio
@@ -405,12 +418,40 @@ def test_3_jsonexportable_update(json_parents: List[JSONParent]):
 
 def test_4_jsonexportable_transform(json_adults: List[JSONAdult]):
     res = JSONParent.transform_many(json_adults)
-    assert len(res) == len(
-        json_adults
-    ), f"could not transform all data: {len(res)} != {len(json_adults)}"
+    N: int = len(json_adults)
+    assert len(res) == N, f"could not transform all data: {len(res)} != {N}"
+
+    res2 = JSONAdult.transform_many(json_adults)
+    assert len(res2) == N, f"could not transform all data: {len(res)} != {N}"
+
+    res3 = JSONParent.from_objs(
+        [adult.model_dump() for adult in json_adults], in_type=JSONAdult
+    )
+    assert len(res3) == N, f"from_objs(in_type=JSONAdult) failed: {len(res)} != {N}"
 
 
-def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
+def test_5_jsonexportable_transform_fails(json_parents: List[JSONParent]):
+    res = JSONAdult.transform_many(json_parents)
+    assert len(res) == 0, f"transform data it should have not: {len(res)} != 0"
+
+    res2 = JSONChild.from_objs(
+        [parent.model_dump() for parent in json_parents], in_type=JSONAdult
+    )
+    assert (
+        len(res2) == 0
+    ), f"from_objs() returned data when it should have not: {len(res)} != 0"
+
+
+def test_6_parse_str_fails(json_parents: List[JSONParent]):
+    for parent in json_parents:
+        assert (
+            _ := JSONAdult.parse_str(parent.json_src())
+        ) is None, (
+            f"parse_str() returned instance from faulty data: {parent.json_src()}"
+        )
+
+
+def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
     family = JSONNeighbours()
     for parent in json_parents:
         family.add(parent)
@@ -421,7 +462,7 @@ def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
 
     family2 = JSONNeighbours()
     parent = JSONParent(
-        name="Mick",
+        name="Erik",
         years=28,
         child=None,
     )
@@ -438,15 +479,15 @@ def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
             ),
         )
     )
-
-    assert family.update(family2), "update() failed"
-    assert family["Mick"] == parent, "__get_item__() failed"
+    added, updated = family.update(family2)
+    assert len(added) == 1 and len(updated) == 1, "update() failed"
+    assert family[parent.name].name == parent.name, "__get_item__() failed"
     if parent in family:
         pass
-    if "Mick" in family:
-        del family["Mick"]
+    if parent.name in family:
+        del family[parent.name]
     else:
-        assert False, "item 'Mick' not found in family even it should"
+        assert False, f"item '{parent.name}' not found in family even it should"
 
     for name, parent in family.items():
         assert name == parent.name, "wrong item returned"
@@ -456,17 +497,29 @@ def test_5_jsonexportablerootdict(json_parents: List[JSONParent]):
     ), f"values() returned incorrect number of items: {len(family)} != {len(family.values())}"
 
     assert (
-        _ := JSONNeighbours.from_obj(family.obj_db())
-    ) is not None, "could not recreate JSONExportableRootDict() from obj_db()"
+        _ := JSONNeighbours.from_obj(family.obj_src())
+    ) is not None, f"could not recreate JSONExportableRootDict() from obj_src(): {str(family.obj_src())}"
 
-    debug(family.json_src())
+    assert (
+        _ := JSONNeighbours.from_obj(family.obj_db())
+    ) is not None, f"could not recreate JSONExportableRootDict() from obj_db(): {str(family.obj_db())}"
+
+    # debug(family.json_src())
     assert (
         _ := JSONNeighbours.parse_str(family.json_src())
-    ) is not None, "could not parse JSONExportableRootDict() from json_src()"
+    ) is not None, (
+        f"could not parse JSONExportableRootDict() from json_src(): {family.json_src()}"
+    )
+
+    assert (
+        _ := JSONNeighbours.parse_str(family.json_db())
+    ) is not None, (
+        f"could not parse JSONExportableRootDict() from json_db(): {family.json_db()}"
+    )
 
 
 @pytest.mark.asyncio
-async def test_5_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
+async def test_8_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
     fn: Path = tmp_path / "export.txt"
 
     await export(awrap(txt_data), "txt", filename="-")  # type: ignore
@@ -496,7 +549,7 @@ async def test_5_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPer
 
 
 @pytest.mark.asyncio
-async def test_6_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
+async def test_9_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
     fn: Path = tmp_path / "export.csv"
 
     await export(awrap(csv_data), "csv", filename="-")  # type: ignore
