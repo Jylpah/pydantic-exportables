@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-exportables"
-version = "1.1.0a2"
+version = "1.1.0a3"
 authors = [{ name = "Jylpah", email = "jylpah@gmail.com" }]
 description = "Python Pydantic BaseModel extension and helpers for easier import/export to different formats (JSON, CSV, TXT)"
 readme = "README.md"
@@ -25,6 +25,7 @@ dependencies = [
     "pydantic>=2.4",
     "pymongo>=4.6",
     "pyutils @ git+https://github.com/Jylpah/pyutils.git@main-1.0",
+    "pydantic-mongo @ git+https://github.com/Jylpah/pydantic-mongo",
 ]
 
 [project.optional-dependencies]
