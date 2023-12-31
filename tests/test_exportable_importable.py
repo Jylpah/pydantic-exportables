@@ -4,6 +4,8 @@ from pydantic import Field, ConfigDict
 from pathlib import Path
 from datetime import date, datetime
 from enum import StrEnum, IntEnum
+
+from bson import ObjectId
 import json
 import logging
 from pydantic_exportables import (
@@ -17,6 +19,7 @@ from pydantic_exportables import (
     Importable,
     AliasMapper,
 )
+from pydantic_mongo import ObjectIdField
 from pyutils import awrap
 from pyutils.utils import epoch_now
 
@@ -103,6 +106,19 @@ class JSONNeighbours(JSONExportableRootDict[JSONParent]):
 
 
 JSONParent.register_transformation(JSONAdult, JSONAdult.transform2JSONParent)
+
+
+class ObjectIdExportable(JSONExportable):
+    id: Annotated[ObjectIdField, Field(default_factory=ObjectId)] = ObjectIdField()
+    name: str = Field(default=..., alias="n")
+
+    @property
+    def index(self) -> ObjectIdField:
+        return self.id
+
+
+class ObjectIdExportableDict(JSONExportableRootDict[ObjectIdExportable]):
+    pass
 
 
 def today() -> datetime:
@@ -616,3 +632,24 @@ async def test_9_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPer
     assert (
         len(csv_data) == 0
     ), f"could not import all the data correctly: {len(csv_data)} != 0"
+
+
+def test_10_ObjectIdField() -> None:
+    d = ObjectIdExportableDict()
+
+    L: int = 10
+    for i in range(L):
+        d.add(ObjectIdExportable(id=ObjectId(), name=f"Name {i}"))
+
+    debug(d.json_src(exclude_defaults=False))
+    assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
+
+    d = ObjectIdExportableDict()
+
+    for i in range(L):
+        d.add(ObjectIdExportable(name=f"Name {i}"))
+
+    debug(d)
+    assert (
+        len(d) == L
+    ), f"could not add all the items with generated ObjectId: {len(d)} != {L}"

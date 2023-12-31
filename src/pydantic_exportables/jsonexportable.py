@@ -22,7 +22,8 @@ from typing import (
     AsyncGenerator,
     Annotated,
 )
-import json
+
+# import json
 from collections.abc import ItemsView, ValuesView, KeysView
 from pathlib import Path
 from collections.abc import MutableMapping
@@ -32,11 +33,12 @@ from pydantic import (
     ValidationError,
     ConfigDict,
     Field,
-    InstanceOf,
-    PlainSerializer,
-    AfterValidator,
-    WithJsonSchema,
+    # InstanceOf,
+    # PlainSerializer,
+    # AfterValidator,
+    # WithJsonSchema,
 )
+from pydantic_mongo import ObjectIdField
 from aiofiles import open
 from bson.objectid import ObjectId
 from pyutils.utils import str2path
@@ -53,13 +55,13 @@ def validate_object_id(v: Any) -> ObjectId:
     raise ValueError("Invalid ObjectId")
 
 
-PyObjectId = Annotated[
-    InstanceOf[ObjectId],
-    # Union[str, ObjectId],
-    AfterValidator(validate_object_id),
-    PlainSerializer(lambda x: str(x), return_type=str),
-    WithJsonSchema({"type": "string"}, mode="serialization"),
-]
+# PyObjectId = Annotated[
+#     InstanceOf[ObjectId],
+#     # Union[str, ObjectId],
+#     AfterValidator(validate_object_id),
+#     PlainSerializer(lambda x: str(x), return_type=str),
+#     WithJsonSchema({"type": "string"}, mode="serialization"),
+# ]
 
 TypeExcludeDict = MutableMapping[int | str, Any]
 
@@ -71,7 +73,7 @@ DESCENDING: Literal[-1] = -1
 ASCENDING: Literal[1] = 1
 TEXT: Literal["text"] = "text"
 
-Idx = Union[str, int, PyObjectId]
+Idx = Union[str, int, ObjectIdField]
 IndexSortOrder = Literal[-1, 1, "text"]
 BackendIndex = tuple[str, IndexSortOrder]
 IdxType = TypeVar("IdxType", bound=Idx)
@@ -214,9 +216,9 @@ class JSONExportable(BaseModel):
     def parse_str(cls, content: str) -> Self | None:
         """return class instance from a JSON string"""
         try:
+            return cls.model_validate_json(content)
             ## WORKAROUND for https://github.com/pydantic/pydantic/issues/8189#issuecomment-1823465499
-            # return cls.model_validate_json(content)
-            return cls.model_validate(json.loads(content), strict=True)
+            # return cls.model_validate(json.loads(content), strict=True)
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
@@ -552,8 +554,8 @@ class JSONExportableRootDict(
         """return class instance from a JSON string"""
         try:
             ## WORKAROUND for https://github.com/pydantic/pydantic/issues/8189#issuecomment-1823465499
-            # return cls.model_validate_json(content)
-            return cls.model_validate(json.loads(content), strict=True)
+            return cls.model_validate_json(content)
+            # return cls.model_validate(json.loads(content), strict=True)
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
