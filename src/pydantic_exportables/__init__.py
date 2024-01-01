@@ -1,9 +1,8 @@
 from .aliasmapper import AliasMapper as AliasMapper
+from .pyobjectid import PyObjectId as PyObjectId
 from .jsonexportable import (
     JSONExportable as JSONExportable,
     JSONExportableRootDict as JSONExportableRootDict,
-    # PyObjectId as PyObjectId,
-    # validate_object_id as validate_object_id,
     TypeExcludeDict as TypeExcludeDict,
     IndexSortOrder as IndexSortOrder,
     BackendIndex as BackendIndex,
@@ -13,6 +12,7 @@ from .jsonexportable import (
     TEXT as TEXT,
     IdxType as IdxType,
 )
+
 from .csvexportable import CSVExportable as CSVExportable
 from .exportable import (
     TXTExportable as TXTExportable,
@@ -36,5 +36,6 @@ __all__ = [
     "csvexportable",
     "exportable",
     "importable",
+    "pyobjectid",
     "utils",
 ]
