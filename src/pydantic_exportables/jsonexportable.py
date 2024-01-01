@@ -38,21 +38,24 @@ from pydantic import (
     # AfterValidator,
     # WithJsonSchema,
 )
-from pydantic_mongo import ObjectIdField
+
+# from pydantic_mongo import ObjectIdField
+
 from aiofiles import open
-from bson.objectid import ObjectId
+from bson import ObjectId
+
 from pyutils.utils import str2path
 
+from .pyobjectid import PyObjectId
 
 # BaseModel.model_config["json_encoders"] = {ObjectId: lambda v: str(v)}
 
-
-def validate_object_id(v: Any) -> ObjectId:
-    if isinstance(v, ObjectId):
-        return v
-    if ObjectId.is_valid(v):
-        return ObjectId(v)
-    raise ValueError("Invalid ObjectId")
+# def validate_object_id(v: Any) -> ObjectId:
+#     if isinstance(v, ObjectId):
+#         return v
+#     if ObjectId.is_valid(v):
+#         return ObjectId(v)
+#     raise ValueError("Invalid ObjectId")
 
 
 # PyObjectId = Annotated[
@@ -62,6 +65,7 @@ def validate_object_id(v: Any) -> ObjectId:
 #     PlainSerializer(lambda x: str(x), return_type=str),
 #     WithJsonSchema({"type": "string"}, mode="serialization"),
 # ]
+
 
 TypeExcludeDict = MutableMapping[int | str, Any]
 
@@ -73,7 +77,7 @@ DESCENDING: Literal[-1] = -1
 ASCENDING: Literal[1] = 1
 TEXT: Literal["text"] = "text"
 
-Idx = Union[str, int, ObjectIdField]
+Idx = Union[str, int, PyObjectId]
 IndexSortOrder = Literal[-1, 1, "text"]
 BackendIndex = tuple[str, IndexSortOrder]
 IdxType = TypeVar("IdxType", bound=Idx)
