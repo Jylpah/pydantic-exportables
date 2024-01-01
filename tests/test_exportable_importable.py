@@ -18,8 +18,10 @@ from pydantic_exportables import (
     TXTImportable,
     Importable,
     AliasMapper,
+    PyObjectId,
 )
-from pydantic_mongo import ObjectIdField
+
+# from pydantic_mongo import ObjectIdField
 from pyutils import awrap
 from pyutils.utils import epoch_now
 
@@ -109,11 +111,11 @@ JSONParent.register_transformation(JSONAdult, JSONAdult.transform2JSONParent)
 
 
 class ObjectIdExportable(JSONExportable):
-    id: Annotated[ObjectIdField, Field(default_factory=ObjectId)] = ObjectIdField()
+    id: Annotated[PyObjectId, Field(default_factory=ObjectId)] = PyObjectId()
     name: str = Field(default=..., alias="n")
 
     @property
-    def index(self) -> ObjectIdField:
+    def index(self) -> Idx:
         return self.id
 
 
@@ -634,7 +636,7 @@ async def test_9_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPer
     ), f"could not import all the data correctly: {len(csv_data)} != 0"
 
 
-def test_10_ObjectIdField() -> None:
+def test_10_PyObjectIdasIdx() -> None:
     d = ObjectIdExportableDict()
 
     L: int = 10
