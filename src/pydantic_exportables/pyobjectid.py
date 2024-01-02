@@ -1,3 +1,6 @@
+## Copyright PhilJay, 2023
+# source https://stackoverflow.com/a/77105412
+
 from typing import Any
 from bson import ObjectId
 from pydantic_core import core_schema
