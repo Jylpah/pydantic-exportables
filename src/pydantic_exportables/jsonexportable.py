@@ -33,6 +33,7 @@ from pydantic import (
     ValidationError,
     ConfigDict,
     Field,
+    model_validator,
     # InstanceOf,
     # PlainSerializer,
     # AfterValidator,
@@ -396,6 +397,14 @@ class JSONExportableRootDict(
         populate_by_name=True,
         from_attributes=True,
     )
+
+    @model_validator(mode='after')
+    def validate_keys(self) -> Self:
+        new_root: Dict[Idx, JSONExportableType] = dict()
+        for value in self.root.values():
+            new_root[value.index] = value
+        self.__dict__["root"] = new_root        
+        return self
 
     def add(self, item: JSONExportableType) -> None:
         self.root[item.index] = item
