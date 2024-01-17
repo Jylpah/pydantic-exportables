@@ -382,13 +382,13 @@ class JSONExportableRootDict(
         revalidate_instances="always",
     )
 
-    @model_validator(mode='after')
-    def validate_keys(self) -> Self:
-        new_root: Dict[Idx, JSONExportableType] = dict()
-        for value in self.root.values():
-            new_root[value.index] = value
-        self.__dict__["root"] = new_root        
-        return self
+    # @model_validator(mode="after")
+    # def validate_keys(self) -> Self:
+    #     new_root: Dict[Idx, JSONExportableType] = dict()
+    #     for value in self.root.values():
+    #         new_root[value.index] = value
+    #     self.__dict__["root"] = new_root
+    #     return self
 
     def add(self, item: JSONExportableType) -> None:
         self.root[item.index] = item
