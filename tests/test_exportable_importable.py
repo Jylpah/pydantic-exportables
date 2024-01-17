@@ -103,11 +103,28 @@ class JSONAdult(JSONExportable):
         )
 
 
-class JSONNeighbours(JSONExportableRootDict[JSONParent]):
+class JSONNeighbours(JSONExportableRootDict[str, JSONParent]):
     pass
 
 
 JSONParent.register_transformation(JSONAdult, JSONAdult.transform2JSONParent)
+
+
+def datetime_as_str() -> str:
+    return datetime.now().isoformat()
+
+
+class JSONIntIdxExportable(JSONExportable):
+    idx: int = Field(default=...)
+    name: str = Field(default_factory=datetime_as_str)
+
+    @property
+    def index(self) -> Idx:
+        return self.idx
+
+
+class IntIdxExportableDict(JSONExportableRootDict[int, JSONIntIdxExportable]):
+    pass
 
 
 class ObjectIdExportable(JSONExportable):
@@ -119,7 +136,7 @@ class ObjectIdExportable(JSONExportable):
         return self.id
 
 
-class ObjectIdExportableDict(JSONExportableRootDict[ObjectIdExportable]):
+class ObjectIdExportableDict(JSONExportableRootDict[PyObjectId, ObjectIdExportable]):
     pass
 
 
@@ -492,10 +509,8 @@ def test_5_jsonexportable_transform_fails(json_parents: List[JSONParent]):
 def test_6_parse_str_fails(json_parents: List[JSONParent]):
     for parent in json_parents:
         assert (
-            _ := JSONAdult.parse_str(parent.json_src())
-        ) is None, (
-            f"parse_str() returned instance from faulty data: {parent.json_src()}"
-        )
+            (_ := JSONAdult.parse_str(parent.json_src())) is None
+        ), f"parse_str() returned instance from faulty data: {parent.json_src()}"
 
 
 def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
@@ -539,30 +554,26 @@ def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
     for name, parent in family.items():
         assert name == parent.name, "wrong item returned"
 
-    assert len(family) == len(
-        family.values()
+    assert (
+        len(family) == len(family.values())
     ), f"values() returned incorrect number of items: {len(family)} != {len(family.values())}"
 
     assert (
-        _ := JSONNeighbours.from_obj(family.obj_src())
-    ) is not None, f"could not recreate JSONExportableRootDict() from obj_src(): {str(family.obj_src())}"
+        (_ := JSONNeighbours.from_obj(family.obj_src())) is not None
+    ), f"could not recreate JSONExportableRootDict() from obj_src(): {str(family.obj_src())}"
 
     assert (
-        _ := JSONNeighbours.from_obj(family.obj_db())
-    ) is not None, f"could not recreate JSONExportableRootDict() from obj_db(): {str(family.obj_db())}"
+        (_ := JSONNeighbours.from_obj(family.obj_db())) is not None
+    ), f"could not recreate JSONExportableRootDict() from obj_db(): {str(family.obj_db())}"
 
     # debug(family.json_src())
     assert (
-        _ := JSONNeighbours.parse_str(family.json_src())
-    ) is not None, (
-        f"could not parse JSONExportableRootDict() from json_src(): {family.json_src()}"
-    )
+        (_ := JSONNeighbours.parse_str(family.json_src())) is not None
+    ), f"could not parse JSONExportableRootDict() from json_src(): {family.json_src()}"
 
     assert (
-        _ := JSONNeighbours.parse_str(family.json_db())
-    ) is not None, (
-        f"could not parse JSONExportableRootDict() from json_db(): {family.json_db()}"
-    )
+        (_ := JSONNeighbours.parse_str(family.json_db())) is not None
+    ), f"could not parse JSONExportableRootDict() from json_db(): {family.json_db()}"
 
 
 @pytest.mark.asyncio
@@ -627,9 +638,7 @@ async def test_9_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPer
             else:
                 assert False, f"imported data not in the original: {data_imported}"
         except ValueError:
-            assert (
-                False
-            ), f"export/import conversion error. imported data={data_imported} is not in input data"
+            assert False, f"export/import conversion error. imported data={data_imported} is not in input data"
 
     assert (
         len(csv_data) == 0
@@ -646,6 +655,21 @@ def test_10_PyObjectIdasIdx() -> None:
     debug(d.json_src(exclude_defaults=False))
     assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
 
+    assert (
+        imported := ObjectIdExportableDict.parse_str(d.json_src())
+    ) is not None, "could not parse exported JSON"
+    assert (
+        len(imported) == len(d)
+    ), f"the size of the imported 'ObjectIdExportableDict' does not match the exporterd: {len(imported)} != {len(d)}"
+
+    for key, value in imported.items():
+        assert isinstance(
+            key, ObjectId
+        ), f"the imported keys are not type of ObjectId, but {type(key)}"
+        assert isinstance(
+            value.index, ObjectId
+        ), f"imported objects 'id' field is {type(value.index)}, not ObjectId"
+
     d = ObjectIdExportableDict()
 
     for i in range(L):
@@ -655,3 +679,32 @@ def test_10_PyObjectIdasIdx() -> None:
     assert (
         len(d) == L
     ), f"could not add all the items with generated ObjectId: {len(d)} != {L}"
+
+
+@pytest.mark.asyncio
+async def test_11_IntasIdx(tmp_path: Path) -> None:
+    d = IntIdxExportableDict()
+    export_fn: Path = tmp_path / "test_11_IntasIdx.json"
+    L: int = 20
+    for i in range(L):
+        d.add(JSONIntIdxExportable(idx=i))
+
+    debug(d.json_src(exclude_defaults=False))
+    assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
+    assert (
+        await d.save_json(export_fn) > 0
+    ), "could not export IntIdxExportableDict to JSON"
+
+    assert (
+        imported := await IntIdxExportableDict.open_json(export_fn)
+    ) is not None, "could not import IntIdxExportableDict from JSON"
+
+    assert (
+        len(imported) == len(d)
+    ), f"the imported object has incorrect number of objects: {len(imported)} != {len(d)}"
+
+    for key, value in imported.items():
+        assert isinstance(key, int), f"imported key is not type 'int', but {type(key)}"
+        assert isinstance(
+            value.index, int
+        ), f"imported objects 'id' field is {type(value.index)}, not int"
