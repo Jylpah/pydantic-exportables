@@ -33,7 +33,7 @@ from pydantic import (
     ValidationError,
     ConfigDict,
     Field,
-    model_validator,
+    # model_validator,
     # InstanceOf,
     # PlainSerializer,
     # AfterValidator,
@@ -48,24 +48,6 @@ from bson import ObjectId
 from pyutils.utils import str2path
 
 from .pyobjectid import PyObjectId
-
-# BaseModel.model_config["json_encoders"] = {ObjectId: lambda v: str(v)}
-
-# def validate_object_id(v: Any) -> ObjectId:
-#     if isinstance(v, ObjectId):
-#         return v
-#     if ObjectId.is_valid(v):
-#         return ObjectId(v)
-#     raise ValueError("Invalid ObjectId")
-
-
-# PyObjectId = Annotated[
-#     InstanceOf[ObjectId],
-#     # Union[str, ObjectId],
-#     AfterValidator(validate_object_id),
-#     PlainSerializer(lambda x: str(x), return_type=str),
-#     WithJsonSchema({"type": "string"}, mode="serialization"),
-# ]
 
 
 TypeExcludeDict = MutableMapping[int | str, Any]
@@ -566,76 +548,7 @@ class JSONExportableRootDict(
     def parse_str(cls, content: str) -> Self | None:
         """return class instance from a JSON string"""
         try:
-            ## WORKAROUND for https://github.com/pydantic/pydantic/issues/8189#issuecomment-1823465499
             return cls.model_validate_json(content)
-            # return cls.model_validate(json.loads(content), strict=True)
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
-
-    # def model_dump(  # type: ignore
-    #     self,
-    #     *,
-    #     mode: str = "python",
-    #     include: Any = None,
-    #     exclude: Any = None,
-    #     by_alias: bool = False,
-    #     exclude_unset: bool = False,
-    #     exclude_defaults: bool = False,
-    #     exclude_none: bool = False,
-    #     round_trip: bool = False,
-    #     warnings: bool = True,
-    # ) -> Dict[str | int, Any]:
-    #     res: Dict[str | int, Any] = dict()
-    #     for key, value in self.items():
-    #         _key: str | int
-    #         if isinstance(key, ObjectId):
-    #             _key = str(key)
-    #         else:
-    #             _key = key
-    #         res[_key] = value.model_dump(
-    #             mode=mode,
-    #             include=include,
-    #             exclude=exclude,
-    #             by_alias=by_alias,
-    #             exclude_unset=exclude_unset,
-    #             exclude_defaults=exclude_defaults,
-    #             exclude_none=exclude_none,
-    #             round_trip=round_trip,
-    #             warnings=warnings,
-    #         )
-    #     return res
-
-
-# class Map(JSONExportable):
-#     name: str
-#     code: PyObjectId
-#     id: int = Field(default=2)
-
-#     _exclude_defaults = True
-
-#     @property
-#     def index(self) -> PyObjectId:
-#         return self.code
-
-
-# class Maps(JSONExportableRootDict[Map]):
-#     model_config = ConfigDict(
-#         frozen=False,
-#         validate_assignment=True,
-#         populate_by_name=True,
-#         from_attributes=True,
-#     )
-
-
-# maps = Maps()
-
-# for i in range(5):
-#     maps.add(Map(name=f"test {i}", code=ObjectId(), id=i))
-
-
-# print(maps.json_db())
-
-
-# class TestClass(JSONExportable):
-#     data: Maps = Field(default_factory=Maps)
