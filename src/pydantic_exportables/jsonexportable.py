@@ -94,6 +94,7 @@ class JSONExportable(BaseModel):
 
     model_config = ConfigDict(
         frozen=False,
+        revalidate_instances="always",
         validate_assignment=True,
         populate_by_name=True,
         from_attributes=True,
@@ -378,6 +379,7 @@ class JSONExportableRootDict(
         validate_assignment=True,
         populate_by_name=True,
         from_attributes=True,
+        revalidate_instances="always",
     )
 
     @model_validator(mode='after')
