@@ -130,7 +130,8 @@ class JSONExportable(BaseModel):
             else:
                 return cls._transformations[type(in_obj)](in_obj)  # type: ignore
         except Exception as err:
-            error(f"failed to transform {type(in_obj)} to {cls}: {err}")
+            error(f"failed to transform {type(in_obj)} to {cls}")
+            debug(f"{err}")
         return None
 
     @classmethod
@@ -150,13 +151,17 @@ class JSONExportable(BaseModel):
             try:
                 return cls.model_validate(obj)
             except ValidationError as err:
-                error("could not parse object as %s: %s", cls.__name__, str(err))
+                error("could not parse object as %s", cls.__name__)
+                debug("%s", str(err))
         else:
             try:
                 if (obj_in := in_type.model_validate(obj)) is not None:
                     return cls.transform(obj_in)
             except ValidationError as err:
-                error("could not parse object as %s: %s", cls.__name__, str(err))
+                error(
+                    "could not parse object (%s) as %s", in_type.__name__, cls.__name__
+                )
+                debug("%s", str(err))
         return None
 
     @classmethod
