@@ -21,7 +21,7 @@ from pydantic_exportables import (
 )
 
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info
@@ -39,9 +39,6 @@ N_SLOW: int = 5
 
 THREADS: int = 5
 # N : int = int(1e10)
-
-logger = logging.getLogger()
-message = logger.warning
 
 
 class Eyes(StrEnum):

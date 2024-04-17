@@ -35,7 +35,7 @@ from pyutils.utils import epoch_now
 # 2) Create instances, export as CSV, import back and compare
 # 3) Create instances, export as TXT, import back and compare
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info
