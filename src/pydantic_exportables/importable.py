@@ -14,7 +14,7 @@ from .csvexportable import CSVExportable
 from pyutils.utils import str2path
 
 # Setup logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info

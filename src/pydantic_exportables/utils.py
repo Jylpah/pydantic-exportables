@@ -8,7 +8,7 @@ from pyutils.utils import get_url
 
 
 # Setup logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info

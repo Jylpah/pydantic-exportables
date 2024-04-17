@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Iterable, TypeVar
 import logging
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info

@@ -58,7 +58,7 @@ IdxType = TypeVar("IdxType", bound=Idx)
 JSONExportableType = TypeVar("JSONExportableType", bound="JSONExportable")
 
 # Setup logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info
@@ -365,9 +365,9 @@ class JSONExportableRootDict(
 ):
     """Pydantic RootModel baseclass for JSONExportable"""
 
-    root: Annotated[
-        Dict[IdxType, JSONExportableType], Field(default_factory=dict)
-    ] = dict()
+    root: Annotated[Dict[IdxType, JSONExportableType], Field(default_factory=dict)] = (
+        dict()
+    )
 
     _sorted: bool = True  # sort items
 
