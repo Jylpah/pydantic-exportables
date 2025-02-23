@@ -34,9 +34,7 @@ from pydantic import (
     ConfigDict,
     Field,
 )
-
-from pyutils.utils import str2path
-
+from deprecated import deprecated
 from .pyobjectid import PyObjectId
 
 
@@ -63,6 +61,15 @@ error = logger.error
 message = logger.warning
 verbose = logger.info
 debug = logger.debug
+
+
+def str2path(filename: str | Path, suffix: str | None = None) -> Path:
+    """convert filename (str) to pathlib.Path"""
+    if isinstance(filename, str):
+        filename = Path(filename)
+    if suffix is not None and not filename.name.lower().endswith(suffix):
+        filename = filename.with_suffix(suffix)
+    return filename
 
 
 class JSONExportable(BaseModel):
