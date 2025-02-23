@@ -26,7 +26,11 @@ from .importable import (
     Importable as Importable,
 )
 from .utils import (
+    get_url as get_url,
+    get_url_res as get_url_res,
     get_model as get_model,
+    get_model_res as get_model_res,
+    str2path as str2path,
 )
 
 

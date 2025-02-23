@@ -34,17 +34,13 @@ from pydantic import (
     ConfigDict,
     Field,
 )
-
-from pyutils.utils import str2path
-
+from deprecated import deprecated
 from .pyobjectid import PyObjectId
+
+from .utils import str2path
 
 
 TypeExcludeDict = MutableMapping[int | str, Any]
-
-# D = TypeVar("D", bound="JSONExportable")
-# J = TypeVar("J", bound="JSONExportable")
-# O = TypeVar("O", bound="JSONExportable")
 
 DESCENDING: Literal[-1] = -1
 ASCENDING: Literal[1] = 1
@@ -58,7 +54,7 @@ IdxType = TypeVar("IdxType", bound=Idx)
 JSONExportableType = TypeVar("JSONExportableType", bound="JSONExportable")
 
 # Setup logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info
@@ -249,22 +245,30 @@ class JSONExportable(BaseModel):
         params.update(kwargs)
         return params
 
+    # TODO: Create a Protocol and move implementation to blitz-stats
     @property
+    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def index(self) -> Idx:
         """return backend index"""
         raise NotImplementedError
 
+    # TODO: Create a Protocol and move implementation to blitz-stats
     @property
+    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def indexes(self) -> dict[str, Idx]:
         """return backend indexes"""
         raise NotImplementedError
 
+    # TODO: Create a Protocol and move implementation to blitz-stats
     @classmethod
+    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
         """return backend search indexes"""
         raise NotImplementedError
 
+    # TODO: Create a Protocol and move implementation to blitz-stats
     @classmethod
+    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def example_instance(cls) -> Self:
         """return a example instance of the class"""
         if len(cls._example) > 0:
@@ -365,9 +369,9 @@ class JSONExportableRootDict(
 ):
     """Pydantic RootModel baseclass for JSONExportable"""
 
-    root: Annotated[
-        Dict[IdxType, JSONExportableType], Field(default_factory=dict)
-    ] = dict()
+    root: Annotated[Dict[IdxType, JSONExportableType], Field(default_factory=dict)] = (
+        dict()
+    )
 
     _sorted: bool = True  # sort items
 

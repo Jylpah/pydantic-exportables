@@ -21,7 +21,6 @@ from pydantic_exportables import (
     PyObjectId,
 )
 
-# from pydantic_mongo import ObjectIdField
 from pyutils import awrap
 from pyutils.utils import epoch_now
 
@@ -35,7 +34,7 @@ from pyutils.utils import epoch_now
 # 2) Create instances, export as CSV, import back and compare
 # 3) Create instances, export as TXT, import back and compare
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info
@@ -336,23 +335,23 @@ async def test_1_json_exportable_import_save(
     assert len(imported) == 0, "Export or import failed"
 
     for parent in json_parents:
-        assert (
-            await parent.save_json(fn) > 0
-        ), f"could not save JSONExportable: {str(parent)}"
-        assert (
-            parent_imported := await JSONParent.open_json(fn)
-        ) is not None, f"could not import save json: {str(parent)}"
-        assert (
-            parent == parent_imported
-        ), f"imported data does not match original: original={parent}, imported={parent_imported}"
-        assert (
-            adult := await JSONAdult.open_json(fn)
-        ) is None, f"open_json() returned instance even it should not: {adult}"
+        assert await parent.save_json(fn) > 0, (
+            f"could not save JSONExportable: {str(parent)}"
+        )
+        assert (parent_imported := await JSONParent.open_json(fn)) is not None, (
+            f"could not import save json: {str(parent)}"
+        )
+        assert parent == parent_imported, (
+            f"imported data does not match original: original={parent}, imported={parent_imported}"
+        )
+        assert (adult := await JSONAdult.open_json(fn)) is None, (
+            f"open_json() returned instance even it should not: {adult}"
+        )
 
     parent = json_parents[0]
-    assert (
-        await parent.save_json(fn.with_suffix("")) > 0
-    ), f"could not save JSONExportable: {str(parent)}"
+    assert await parent.save_json(fn.with_suffix("")) > 0, (
+        f"could not save JSONExportable: {str(parent)}"
+    )
 
     # Test for opening non-existent file
     assert (
@@ -371,13 +370,13 @@ async def test_2_json_exportable_include_exclude() -> None:
     parent_src: dict
     parent_db: dict
     parent_src = json.loads(parent.json_src())
-    assert (
-        "array" in parent_src
-    ), "json_src() failed: _exclude_unset set 'False', 'array' excluded"
+    assert "array" in parent_src, (
+        "json_src() failed: _exclude_unset set 'False', 'array' excluded"
+    )
     parent_db = json.loads(parent.json_db())
-    assert (
-        "m" not in parent_db
-    ), "json_db() failed: _exclude_defaults set 'True', 'c' included"
+    assert "m" not in parent_db, (
+        "json_db() failed: _exclude_defaults set 'True', 'c' included"
+    )
 
     for excl, incl in zip(["child", None], ["name", None]):
         kwargs: dict[str, set[str]] = dict()
@@ -389,55 +388,55 @@ async def test_2_json_exportable_include_exclude() -> None:
         parent_src = json.loads(parent.json_src(fields=None, **kwargs))
         parent_db = json.loads(parent.json_db(fields=None, **kwargs))
         if excl is not None:
-            assert (
-                mapper.alias(excl) not in parent_db
-            ), f"json_src() failed: excluded field {excl} included"
-            assert (
-                excl not in parent_src
-            ), f"json_db() failed: excluded field {excl} included"
+            assert mapper.alias(excl) not in parent_db, (
+                f"json_src() failed: excluded field {excl} included"
+            )
+            assert excl not in parent_src, (
+                f"json_db() failed: excluded field {excl} included"
+            )
         if incl is not None:
-            assert (
-                incl in parent_src
-            ), f"json_src() failed: included field {incl} excluded"
-            assert (
-                mapper.alias(incl) in parent_db
-            ), f"json_db() failed: included field {incl} excluded"
+            assert incl in parent_src, (
+                f"json_src() failed: included field {incl} excluded"
+            )
+            assert mapper.alias(incl) in parent_db, (
+                f"json_db() failed: included field {incl} excluded"
+            )
 
     parent_src = parent.obj_src(fields=["name", "array"])
-    assert (
-        "years" not in parent_src
-    ), "json_src() failed: excluded field 'years' included"
+    assert "years" not in parent_src, (
+        "json_src() failed: excluded field 'years' included"
+    )
     assert "array" in parent_src, "json_src() failed: included field 'array' excluded"
 
     parent_db = parent.obj_db(fields=["name", "array"])
-    assert (
-        mapper.alias("years") not in parent_db
-    ), "json_db() failed: excluded field 'years' included"
-    assert (
-        mapper.alias("array") in parent_db
-    ), "json_db() failed: included field 'array' excluded"
+    assert mapper.alias("years") not in parent_db, (
+        "json_db() failed: excluded field 'years' included"
+    )
+    assert mapper.alias("array") in parent_db, (
+        "json_db() failed: included field 'array' excluded"
+    )
 
     parent_src = parent.obj_src()
-    assert (
-        parent_new := JSONParent.from_obj(parent_src)
-    ) is not None, "could not create object from exported model"
-    assert (
-        parent == parent_new
-    ), f"re-created object is different to original: {parent_new}"
+    assert (parent_new := JSONParent.from_obj(parent_src)) is not None, (
+        "could not create object from exported model"
+    )
+    assert parent == parent_new, (
+        f"re-created object is different to original: {parent_new}"
+    )
 
     parent_db = parent.obj_db()
-    assert (
-        parent_new := JSONParent.from_obj(parent_db)
-    ) is not None, "could not create object from exported model"
-    assert (
-        parent == parent_new
-    ), f"re-created object is different to original: {parent_new}"
+    assert (parent_new := JSONParent.from_obj(parent_db)) is not None, (
+        "could not create object from exported model"
+    )
+    assert parent == parent_new, (
+        f"re-created object is different to original: {parent_new}"
+    )
 
     parent_fail = parent.obj_src()
     del parent_fail["name"]
-    assert (
-        _ := JSONParent.from_obj(parent_fail)
-    ) is None, f"from_obj() return an instance from faulty data: {parent_fail}"
+    assert (_ := JSONParent.from_obj(parent_fail)) is None, (
+        f"from_obj() return an instance from faulty data: {parent_fail}"
+    )
 
 
 def test_3_jsonexportable_update(json_parents: List[JSONParent]):
@@ -451,12 +450,12 @@ def test_3_jsonexportable_update(json_parents: List[JSONParent]):
     p: JSONParent = p0.model_copy(deep=True)
 
     for new in json_parents[1:]:
-        assert not p.update(
-            new, match_index=True
-        ), "update succeeded even the indexes do not match"
-    assert p.update(
-        p1, match_index=False
-    ), "update did not succeeded even the indexes were ignored"
+        assert not p.update(new, match_index=True), (
+            "update succeeded even the indexes do not match"
+        )
+    assert p.update(p1, match_index=False), (
+        "update did not succeeded even the indexes were ignored"
+    )
     assert all(
         [
             p.name == p1.name,
@@ -466,9 +465,9 @@ def test_3_jsonexportable_update(json_parents: List[JSONParent]):
             p.child == p0.child,
         ]
     ), f"update() failed: updated={str(p)}"
-    assert p.update(
-        p2, match_index=False
-    ), "update did not succeeded even the indexes were ignored"
+    assert p.update(p2, match_index=False), (
+        "update did not succeeded even the indexes were ignored"
+    )
     assert all(
         [
             p.name == p2.name,
@@ -501,16 +500,16 @@ def test_5_jsonexportable_transform_fails(json_parents: List[JSONParent]):
     res2 = JSONChild.from_objs(
         [parent.model_dump() for parent in json_parents], in_type=JSONAdult
     )
-    assert (
-        len(res2) == 0
-    ), f"from_objs() returned data when it should have not: {len(res)} != 0"
+    assert len(res2) == 0, (
+        f"from_objs() returned data when it should have not: {len(res)} != 0"
+    )
 
 
 def test_6_parse_str_fails(json_parents: List[JSONParent]):
     for parent in json_parents:
-        assert (
-            (_ := JSONAdult.parse_str(parent.json_src())) is None
-        ), f"parse_str() returned instance from faulty data: {parent.json_src()}"
+        assert (_ := JSONAdult.parse_str(parent.json_src())) is None, (
+            f"parse_str() returned instance from faulty data: {parent.json_src()}"
+        )
 
 
 def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
@@ -518,9 +517,9 @@ def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
     for parent in json_parents:
         family.add(parent)
 
-    assert len(family) == len(
-        json_parents
-    ), f"could not add all the list members: {family} != {len(json_parents)}"
+    assert len(family) == len(json_parents), (
+        f"could not add all the list members: {family} != {len(json_parents)}"
+    )
 
     family2 = JSONNeighbours()
     parent = JSONParent(
@@ -554,26 +553,26 @@ def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
     for name, parent in family.items():
         assert name == parent.name, "wrong item returned"
 
-    assert (
-        len(family) == len(family.values())
-    ), f"values() returned incorrect number of items: {len(family)} != {len(family.values())}"
+    assert len(family) == len(family.values()), (
+        f"values() returned incorrect number of items: {len(family)} != {len(family.values())}"
+    )
 
-    assert (
-        (_ := JSONNeighbours.from_obj(family.obj_src())) is not None
-    ), f"could not recreate JSONExportableRootDict() from obj_src(): {str(family.obj_src())}"
+    assert (_ := JSONNeighbours.from_obj(family.obj_src())) is not None, (
+        f"could not recreate JSONExportableRootDict() from obj_src(): {str(family.obj_src())}"
+    )
 
-    assert (
-        (_ := JSONNeighbours.from_obj(family.obj_db())) is not None
-    ), f"could not recreate JSONExportableRootDict() from obj_db(): {str(family.obj_db())}"
+    assert (_ := JSONNeighbours.from_obj(family.obj_db())) is not None, (
+        f"could not recreate JSONExportableRootDict() from obj_db(): {str(family.obj_db())}"
+    )
 
     # debug(family.json_src())
-    assert (
-        (_ := JSONNeighbours.parse_str(family.json_src())) is not None
-    ), f"could not parse JSONExportableRootDict() from json_src(): {family.json_src()}"
+    assert (_ := JSONNeighbours.parse_str(family.json_src())) is not None, (
+        f"could not parse JSONExportableRootDict() from json_src(): {family.json_src()}"
+    )
 
-    assert (
-        (_ := JSONNeighbours.parse_str(family.json_db())) is not None
-    ), f"could not parse JSONExportableRootDict() from json_db(): {family.json_db()}"
+    assert (_ := JSONNeighbours.parse_str(family.json_db())) is not None, (
+        f"could not parse JSONExportableRootDict() from json_db(): {family.json_db()}"
+    )
 
 
 @pytest.mark.asyncio
@@ -592,9 +591,9 @@ async def test_8_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPer
     except Exception as err:
         assert False, f"failed to import test data: {err}"
 
-    assert len(imported) == len(
-        txt_data
-    ), f"failed to import all data from TXT file: {len(imported)} != {len(txt_data)}"
+    assert len(imported) == len(txt_data), (
+        f"failed to import all data from TXT file: {len(imported)} != {len(txt_data)}"
+    )
 
     for data in txt_data:
         debug("trying to remove data=%s from imported", str(data))
@@ -622,27 +621,29 @@ async def test_9_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPer
     except Exception as err:
         assert False, f"failed to import test data: {err}"
 
-    assert len(imported) == len(
-        csv_data
-    ), f"could not import all CSV data: {len(imported)} != {len(csv_data)}"
+    assert len(imported) == len(csv_data), (
+        f"could not import all CSV data: {len(imported)} != {len(csv_data)}"
+    )
     for data_imported in imported:
         debug("hash(data_imported)=%d", hash(data_imported))
         try:
             if data_imported in csv_data:
                 ndx: int = csv_data.index(data_imported)
                 data = csv_data[ndx]
-                assert (
-                    data == data_imported
-                ), f"imported data different from original: {data_imported} != {data}"
+                assert data == data_imported, (
+                    f"imported data different from original: {data_imported} != {data}"
+                )
                 csv_data.pop(ndx)
             else:
                 assert False, f"imported data not in the original: {data_imported}"
         except ValueError:
-            assert False, f"export/import conversion error. imported data={data_imported} is not in input data"
+            assert False, (
+                f"export/import conversion error. imported data={data_imported} is not in input data"
+            )
 
-    assert (
-        len(csv_data) == 0
-    ), f"could not import all the data correctly: {len(csv_data)} != 0"
+    assert len(csv_data) == 0, (
+        f"could not import all the data correctly: {len(csv_data)} != 0"
+    )
 
 
 def test_10_PyObjectIdasIdx() -> None:
@@ -655,20 +656,20 @@ def test_10_PyObjectIdasIdx() -> None:
     debug(d.json_src(exclude_defaults=False))
     assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
 
-    assert (
-        imported := ObjectIdExportableDict.parse_str(d.json_src())
-    ) is not None, "could not parse exported JSON"
-    assert (
-        len(imported) == len(d)
-    ), f"the size of the imported 'ObjectIdExportableDict' does not match the exporterd: {len(imported)} != {len(d)}"
+    assert (imported := ObjectIdExportableDict.parse_str(d.json_src())) is not None, (
+        "could not parse exported JSON"
+    )
+    assert len(imported) == len(d), (
+        f"the size of the imported 'ObjectIdExportableDict' does not match the exporterd: {len(imported)} != {len(d)}"
+    )
 
     for key, value in imported.items():
-        assert isinstance(
-            key, ObjectId
-        ), f"the imported keys are not type of ObjectId, but {type(key)}"
-        assert isinstance(
-            value.index, ObjectId
-        ), f"imported objects 'id' field is {type(value.index)}, not ObjectId"
+        assert isinstance(key, ObjectId), (
+            f"the imported keys are not type of ObjectId, but {type(key)}"
+        )
+        assert isinstance(value.index, ObjectId), (
+            f"imported objects 'id' field is {type(value.index)}, not ObjectId"
+        )
 
     d = ObjectIdExportableDict()
 
@@ -676,9 +677,9 @@ def test_10_PyObjectIdasIdx() -> None:
         d.add(ObjectIdExportable(name=f"Name {i}"))
 
     debug(d)
-    assert (
-        len(d) == L
-    ), f"could not add all the items with generated ObjectId: {len(d)} != {L}"
+    assert len(d) == L, (
+        f"could not add all the items with generated ObjectId: {len(d)} != {L}"
+    )
 
 
 @pytest.mark.asyncio
@@ -691,20 +692,20 @@ async def test_11_IntasIdx(tmp_path: Path) -> None:
 
     debug(d.json_src(exclude_defaults=False))
     assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
-    assert (
-        await d.save_json(export_fn) > 0
-    ), "could not export IntIdxExportableDict to JSON"
+    assert await d.save_json(export_fn) > 0, (
+        "could not export IntIdxExportableDict to JSON"
+    )
 
-    assert (
-        imported := await IntIdxExportableDict.open_json(export_fn)
-    ) is not None, "could not import IntIdxExportableDict from JSON"
+    assert (imported := await IntIdxExportableDict.open_json(export_fn)) is not None, (
+        "could not import IntIdxExportableDict from JSON"
+    )
 
-    assert (
-        len(imported) == len(d)
-    ), f"the imported object has incorrect number of objects: {len(imported)} != {len(d)}"
+    assert len(imported) == len(d), (
+        f"the imported object has incorrect number of objects: {len(imported)} != {len(d)}"
+    )
 
     for key, value in imported.items():
         assert isinstance(key, int), f"imported key is not type 'int', but {type(key)}"
-        assert isinstance(
-            value.index, int
-        ), f"imported objects 'id' field is {type(value.index)}, not int"
+        assert isinstance(value.index, int), (
+            f"imported objects 'id' field is {type(value.index)}, not int"
+        )

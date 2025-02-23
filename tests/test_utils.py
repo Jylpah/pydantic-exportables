@@ -1,5 +1,5 @@
 import pytest  # type: ignore
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import pairwise, accumulate
 from functools import cached_property
 from typing import Generator
@@ -12,16 +12,19 @@ from enum import StrEnum, IntEnum
 from pyutils.utils import epoch_now
 from pyutils import ThrottledClientSession
 from asyncio import sleep
+from result import Ok, Result
 import logging
+import sys
 from pydantic_exportables import (
     Idx,
     JSONExportable,
     Importable,
     get_model,
+    get_model_res,
 )
 
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 error = logger.error
 message = logger.warning
 verbose = logger.info
@@ -39,9 +42,6 @@ N_SLOW: int = 5
 
 THREADS: int = 5
 # N : int = int(1e10)
-
-logger = logging.getLogger()
-message = logger.warning
 
 
 class Eyes(StrEnum):
@@ -102,6 +102,12 @@ def json_data() -> list[JSONParent]:
     return res
 
 
+@pytest.fixture
+def json_parent() -> JSONParent:
+    c1 = JSONChild(name="c1")
+    return JSONParent(name="Erik", years=34, array=["one", "two"], child=c1)
+
+
 class _HttpRequestHandler(BaseHTTPRequestHandler):
     """HTTPServer mock request handler"""
 
@@ -111,7 +117,7 @@ class _HttpRequestHandler(BaseHTTPRequestHandler):
     def url(self):
         return urlparse(self.path)
 
-    def do_GET(self) -> None:  # pylint: disable=invalid-name
+    def do_GET(self) -> None:
         """Handle GET requests"""
         self.send_response(200)
         if self.url.path == MODEL_PATH:
@@ -125,27 +131,27 @@ class _HttpRequestHandler(BaseHTTPRequestHandler):
         else:
             self.send_header("Content-Type", "application/txt")
             self.end_headers()
-            self.wfile.write(datetime.utcnow().isoformat().encode())
+            self.wfile.write(datetime.now(timezone.utc).isoformat().encode())
 
     def do_POST(self) -> None:  # pylint: disable=invalid-name
         """Handle POST requests
         DOES NOT WORK YET"""
-        message(f"POST @ {datetime.utcnow()}")
+        message(f"POST @ {datetime.now(timezone.utc)}")
         self.send_response(200)
         self.send_header("Content-Type", "application/txt")
         self.end_headers()
         if self.url.path == MODEL_PATH:
-            message(f"POST {self.url.path} @ {datetime.utcnow()}")
+            message(f"POST {self.url.path} @ {datetime.now(timezone.utc)}")
             if (
                 _ := JSONParent.model_validate_json(self.rfile.read().decode())
             ) is not None:
                 # assert False, "POST read content OK"
-                message(f"POST OK @ {datetime.utcnow()}")
+                message(f"POST OK @ {datetime.now(timezone.utc)}")
                 self.wfile.write("OK".encode())
                 # assert False, "POST did write"
             else:
                 # assert False, "POST read content ERROR"
-                message(f"POST ERROR @ {datetime.utcnow()}")
+                message(f"POST ERROR @ {datetime.now(datetime.timezone.utc)}")
                 self.wfile.write("ERROR".encode())
         # assert False, "do_POST()"
 
@@ -226,16 +232,15 @@ def model_path() -> str:
     return MODEL_PATH
 
 
-# I do not understand why this works on Windows when the same code fails on pyutils
-# @pytest.mark.skipif(
-#     sys.platform == "win32",
-#     reason="not supported on windows: asyncio.loop.create_unix_connection",
-# )
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="not supported on windows: asyncio.loop.create_unix_connection",
+)
 @pytest.mark.timeout(20)
 @pytest.mark.asyncio
 async def test_1_get_model(server_url: str, model_path: str) -> None:
     """Test get_url_model()"""
-    rate_limit: float = RATE_SLOW
+    rate_limit: float = RATE_FAST
     N: int = N_SLOW
     url: str = server_url + model_path
     await sleep(2)  # wait for the slow GH instances to start HTTPserver...
@@ -247,3 +252,34 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
                 )
             ) is None:
                 assert False, "get_url_model() returned None"
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="not supported on windows: asyncio.loop.create_unix_connection",
+)
+@pytest.mark.timeout(20)
+@pytest.mark.asyncio
+async def test_2_get_model_res(server_url: str, model_path: str) -> None:
+    """Test get_url_model_REs()"""
+    rate_limit: float = RATE_FAST
+    N: int = N_SLOW
+    url: str = server_url + model_path
+    res: Result[JSONParent | None, tuple[int, str]]
+    await sleep(2)  # wait for the slow GH instances to start HTTPserver...
+    async with ThrottledClientSession(rate_limit=rate_limit) as session:
+        for _ in range(N):
+            if isinstance(
+                res := await get_model_res(
+                    session=session, url=url, resp_model=JSONParent, retries=2
+                ),
+                Ok,
+            ):
+                assert isinstance(res.ok_value, JSONParent), (
+                    "HTTP server returned wrong type"
+                )
+            else:
+                status: int
+                reason: str
+                status, reason = res.err_value
+                assert False, f"get_url_model() returned error: {status}/{reason}"

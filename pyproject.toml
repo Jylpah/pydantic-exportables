@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-exportables"
-version = "1.1.1"
+version = "1.2"
 authors = [{ name = "Jylpah", email = "jylpah@gmail.com" }]
 description = "Python Pydantic BaseModel extension and helpers for easier import/export to different formats (JSON, CSV, TXT)"
 readme = "README.md"
@@ -22,14 +22,17 @@ dependencies = [
     "aioconsole>=0.6",
     "aiocsv>=1.2",
     "Brotli>=1.1",
+    "Deprecated>=1.2",
     "pydantic>=2.4",
     "pymongo>=4.6",
+    "result>=0.17.0",
     "pyutils @ git+https://github.com/Jylpah/pyutils.git@main-1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "build>=0.10",
+    "types-Deprecated>=1.2",
     "mypy>=1.2",
     "pip-chill>=1.0",
     "pytest",
@@ -62,6 +65,12 @@ plugins = ["pydantic.mypy"]
 exclude = ['tmp']
 mypy_path = ['src']
 
+[tool.pydantic-mypy]
+init_forbid_extra = false
+init_typed = false
+warn_required_dynamic_aliases = false
+warn_untyped_fields = true
+
 [tool.ruff]
 # line-length = 88
 include = ["pyproject.toml", "src/**/*.py", "tests/**/*.py"]
@@ -70,6 +79,13 @@ extend-include = ["*.ipynb"]
 extend-exclude = [".venv", ".vscode" ] 
 fixable = ["ALL"]
 
+
+[tool.pyright]
+reportGeneralTypeIssues = false
+reportInvalidStringEscapeSequence = false
+typeCheckingMode = "off"
+
+
 [tool.pytest.ini_options]
 minversion = "7.4"
 addopts = "-v --cov=src"
@@ -77,6 +93,7 @@ pythonpath = "src" # avoid import path append in test files
 filterwarnings = [
     'ignore:Inheritance class ThrottledClientSession from ClientSession is discouraged:DeprecationWarning',
 ]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.report]
 exclude_also = [
@@ -84,5 +101,3 @@ exclude_also = [
     "@(abc\\.)?abstractmethod",
     ]
 
-[tool.pyright]
-reportGeneralTypeIssues = false
