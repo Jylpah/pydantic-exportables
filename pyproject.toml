@@ -62,6 +62,12 @@ plugins = ["pydantic.mypy"]
 exclude = ['tmp']
 mypy_path = ['src']
 
+[tool.pydantic-mypy]
+init_forbid_extra = false
+init_typed = false
+warn_required_dynamic_aliases = false
+warn_untyped_fields = true
+
 [tool.ruff]
 # line-length = 88
 include = ["pyproject.toml", "src/**/*.py", "tests/**/*.py"]
@@ -69,6 +75,13 @@ indent-width = 4
 extend-include = ["*.ipynb"]
 extend-exclude = [".venv", ".vscode" ] 
 fixable = ["ALL"]
+
+
+[tool.pyright]
+reportGeneralTypeIssues = false
+reportInvalidStringEscapeSequence = false
+typeCheckingMode = "off"
+
 
 [tool.pytest.ini_options]
 minversion = "7.4"
@@ -78,11 +91,10 @@ filterwarnings = [
     'ignore:Inheritance class ThrottledClientSession from ClientSession is discouraged:DeprecationWarning',
 ]
 
+
 [tool.coverage.report]
 exclude_also = [
     "raise NotImplementedError",
     "@(abc\\.)?abstractmethod",
     ]
 
-[tool.pyright]
-reportGeneralTypeIssues = false
