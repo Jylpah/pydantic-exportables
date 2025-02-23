@@ -1,5 +1,5 @@
 import pytest  # type: ignore
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import pairwise, accumulate
 from functools import cached_property
 from typing import Generator
@@ -12,12 +12,15 @@ from enum import StrEnum, IntEnum
 from pyutils.utils import epoch_now
 from pyutils import ThrottledClientSession
 from asyncio import sleep
+from result import Ok, Result
 import logging
+import sys
 from pydantic_exportables import (
     Idx,
     JSONExportable,
     Importable,
     get_model,
+    get_model_res,
 )
 
 
@@ -97,6 +100,12 @@ def json_data() -> list[JSONParent]:
     res.append(JSONParent(name="P2", amount=-6, array=["three", "four"]))
     res.append(JSONParent(name="P3", amount=-6, child=c3))
     return res
+
+
+@pytest.fixture
+def json_parent() -> JSONParent:
+    c1 = JSONChild(name="c1")
+    return JSONParent(name="Erik", years=34, array=["one", "two"], child=c1)
 
 
 class _HttpRequestHandler(BaseHTTPRequestHandler):
@@ -223,16 +232,15 @@ def model_path() -> str:
     return MODEL_PATH
 
 
-# I do not understand why this works on Windows when the same code fails on pyutils
-# @pytest.mark.skipif(
-#     sys.platform == "win32",
-#     reason="not supported on windows: asyncio.loop.create_unix_connection",
-# )
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="not supported on windows: asyncio.loop.create_unix_connection",
+)
 @pytest.mark.timeout(20)
 @pytest.mark.asyncio
 async def test_1_get_model(server_url: str, model_path: str) -> None:
     """Test get_url_model()"""
-    rate_limit: float = RATE_SLOW
+    rate_limit: float = RATE_FAST
     N: int = N_SLOW
     url: str = server_url + model_path
     await sleep(2)  # wait for the slow GH instances to start HTTPserver...
@@ -244,3 +252,34 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
                 )
             ) is None:
                 assert False, "get_url_model() returned None"
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="not supported on windows: asyncio.loop.create_unix_connection",
+)
+@pytest.mark.timeout(20)
+@pytest.mark.asyncio
+async def test_2_get_model_res(server_url: str, model_path: str) -> None:
+    """Test get_url_model_REs()"""
+    rate_limit: float = RATE_FAST
+    N: int = N_SLOW
+    url: str = server_url + model_path
+    res: Result[JSONParent | None, tuple[int, str]]
+    await sleep(2)  # wait for the slow GH instances to start HTTPserver...
+    async with ThrottledClientSession(rate_limit=rate_limit) as session:
+        for _ in range(N):
+            if isinstance(
+                res := await get_model_res(
+                    session=session, url=url, resp_model=JSONParent, retries=2
+                ),
+                Ok,
+            ):
+                assert isinstance(res.ok_value, JSONParent), (
+                    "HTTP server returned wrong type"
+                )
+            else:
+                status: int
+                reason: str
+                status, reason = res.err_value
+                assert False, f"get_url_model() returned error: {status}/{reason}"
