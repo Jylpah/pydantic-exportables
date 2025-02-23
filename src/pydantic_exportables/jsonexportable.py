@@ -245,30 +245,30 @@ class JSONExportable(BaseModel):
         params.update(kwargs)
         return params
 
-    # TODO: Create a Protocol and move implementation to BSxxxxx() classes
+    # TODO: Create a Protocol and move implementation to blitz-stats
     @property
-    @deprecated(version="1.1.2", reason="Will removed in 1.2")
+    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def index(self) -> Idx:
         """return backend index"""
         raise NotImplementedError
 
-    # TODO: Create a Protocol and move implementation to BSxxxxx() classes
+    # TODO: Create a Protocol and move implementation to blitz-stats
     @property
-    @deprecated(version="1.1.2", reason="Will removed in 1.2")
+    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def indexes(self) -> dict[str, Idx]:
         """return backend indexes"""
         raise NotImplementedError
 
-    # TODO: Create a Protocol and move implementation to BSxxxxx() classes
+    # TODO: Create a Protocol and move implementation to blitz-stats
     @classmethod
-    @deprecated(version="1.1.2", reason="Will removed in 1.2")
+    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
         """return backend search indexes"""
         raise NotImplementedError
 
-    # TODO: Create a Protocol and move implementation to BSxxxxx() classes
+    # TODO: Create a Protocol and move implementation to blitz-stats
     @classmethod
-    @deprecated(version="1.1.2", reason="Will removed in 1.2")
+    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def example_instance(cls) -> Self:
         """return a example instance of the class"""
         if len(cls._example) > 0:
