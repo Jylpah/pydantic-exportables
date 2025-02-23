@@ -12,12 +12,14 @@ T = TypeVar("T")
 
 
 class AliasMapper:
-    """Simple class to map Pydantic BaseModel's fields to their aliases"""
+    """
+    Simple class to map Pydantic BaseModel's fields to their aliases
+    """
 
     def __init__(self, model: type[BaseModel]):
-        assert issubclass(
-            model, BaseModel
-        ), "model is not subsclass of pydantic.BaseModel"
+        assert issubclass(model, BaseModel), (
+            "model is not subsclass of pydantic.BaseModel"
+        )
         self._model: type[BaseModel] = model
 
     def alias(self, field: str) -> str:
