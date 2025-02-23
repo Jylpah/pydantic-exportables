@@ -27,6 +27,7 @@ from .importable import (
 )
 from .utils import (
     get_model as get_model,
+    str2path as str2path,
 )
 
 

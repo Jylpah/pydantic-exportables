@@ -1,10 +1,10 @@
 import logging
 
 from typing import Optional, TypeVar
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientError
 from pydantic import BaseModel
-
-from pyutils.utils import get_url
+from pathlib import Path
+from asyncio import CancelledError, sleep
 
 
 # Setup logging
@@ -18,7 +18,6 @@ debug = logger.debug
 MAX_RETRIES: int = 3
 SLEEP: float = 1
 
-
 T = TypeVar("T")
 
 
@@ -30,6 +29,15 @@ T = TypeVar("T")
 
 
 M = TypeVar("M", bound=BaseModel)
+
+
+def str2path(filename: str | Path, suffix: str | None = None) -> Path:
+    """convert filename (str) to pathlib.Path"""
+    if isinstance(filename, str):
+        filename = Path(filename)
+    if suffix is not None and not filename.name.lower().endswith(suffix):
+        filename = filename.with_suffix(suffix)
+    return filename
 
 
 async def get_model(
@@ -51,4 +59,33 @@ async def get_model(
         )
     except Exception as err:
         debug(f"Unexpected error: {err}")
+    return None
+
+
+async def get_url(
+    session: ClientSession, url: str, retries: int = MAX_RETRIES
+) -> str | None:
+    """Retrieve (GET) an URL and return content as text"""
+    assert session is not None, "Session must be initialized first"
+    assert url is not None, "url cannot be None"
+
+    # if not is_url(url):
+    #     raise ValueError(f"URL is malformed: {url}")
+
+    for retry in range(1, retries + 1):
+        debug(f"GET {url} try {retry} / {retries}")
+        try:
+            async with session.get(url) as resp:
+                debug(f"GET {url} HTTP response status {resp.status}/{resp.reason}")
+                if resp.ok:
+                    return await resp.text()
+        except ClientError as err:
+            debug(f"Could not retrieve URL: {url} : {err}")
+        except CancelledError as err:
+            debug(f"Cancelled while still working: {err}")
+            raise
+        # except Exception as err:
+        #     debug(f"Unexpected error {err}")
+        await sleep(SLEEP)
+    verbose(f"Could not retrieve URL: {url}")
     return None

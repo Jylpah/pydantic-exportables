@@ -37,12 +37,10 @@ from pydantic import (
 from deprecated import deprecated
 from .pyobjectid import PyObjectId
 
+from .utils import str2path
+
 
 TypeExcludeDict = MutableMapping[int | str, Any]
-
-# D = TypeVar("D", bound="JSONExportable")
-# J = TypeVar("J", bound="JSONExportable")
-# O = TypeVar("O", bound="JSONExportable")
 
 DESCENDING: Literal[-1] = -1
 ASCENDING: Literal[1] = 1
@@ -61,15 +59,6 @@ error = logger.error
 message = logger.warning
 verbose = logger.info
 debug = logger.debug
-
-
-def str2path(filename: str | Path, suffix: str | None = None) -> Path:
-    """convert filename (str) to pathlib.Path"""
-    if isinstance(filename, str):
-        filename = Path(filename)
-    if suffix is not None and not filename.name.lower().endswith(suffix):
-        filename = filename.with_suffix(suffix)
-    return filename
 
 
 class JSONExportable(BaseModel):
@@ -256,22 +245,30 @@ class JSONExportable(BaseModel):
         params.update(kwargs)
         return params
 
+    # TODO: Create a Protocol and move implementation to BSxxxxx() classes
     @property
+    @deprecated(version="1.1.2", reason="Will removed in 1.2")
     def index(self) -> Idx:
         """return backend index"""
         raise NotImplementedError
 
+    # TODO: Create a Protocol and move implementation to BSxxxxx() classes
     @property
+    @deprecated(version="1.1.2", reason="Will removed in 1.2")
     def indexes(self) -> dict[str, Idx]:
         """return backend indexes"""
         raise NotImplementedError
 
+    # TODO: Create a Protocol and move implementation to BSxxxxx() classes
     @classmethod
+    @deprecated(version="1.1.2", reason="Will removed in 1.2")
     def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
         """return backend search indexes"""
         raise NotImplementedError
 
+    # TODO: Create a Protocol and move implementation to BSxxxxx() classes
     @classmethod
+    @deprecated(version="1.1.2", reason="Will removed in 1.2")
     def example_instance(cls) -> Self:
         """return a example instance of the class"""
         if len(cls._example) > 0:

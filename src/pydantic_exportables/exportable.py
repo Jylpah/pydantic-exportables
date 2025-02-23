@@ -17,7 +17,7 @@ from abc import abstractmethod
 from pyutils.eventcounter import EventCounter
 from .jsonexportable import JSONExportable
 from .csvexportable import CSVExportable
-from pyutils.utils import str2path
+from .utils import str2path
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ async def export_csv(
         try:
             filename = str2path(filename, ".csv")
             if filename.is_file() and (not (force or append)):
-                raise FileExistsError(f"Cannot export to {filename }")
+                raise FileExistsError(f"Cannot export to {filename}")
             mode: Literal["w", "a"] = "a" if append else "w"
 
             debug("opening %s for writing in mode=%s", str(filename), mode)
@@ -216,7 +216,7 @@ async def export_txt(
         else:
             filename = str2path(filename, ".txt")
             if filename.is_file() and (not (force or append)):
-                raise FileExistsError(f"Cannot export to {filename }")
+                raise FileExistsError(f"Cannot export to {filename}")
             mode: Literal["w", "a"] = "a" if append else "w"
 
             async with open(filename, mode=mode) as txtfile:

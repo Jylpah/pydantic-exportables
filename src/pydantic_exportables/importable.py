@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .jsonexportable import JSONExportable
 from .csvexportable import CSVExportable
-from pyutils.utils import str2path
+from .utils import str2path
 
 # Setup logging
 logger = logging.getLogger(__name__)
