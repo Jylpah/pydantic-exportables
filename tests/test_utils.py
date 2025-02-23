@@ -108,7 +108,7 @@ class _HttpRequestHandler(BaseHTTPRequestHandler):
     def url(self):
         return urlparse(self.path)
 
-    def do_GET(self) -> None:  # pylint: disable=invalid-name
+    def do_GET(self) -> None:
         """Handle GET requests"""
         self.send_response(200)
         if self.url.path == MODEL_PATH:
@@ -122,27 +122,27 @@ class _HttpRequestHandler(BaseHTTPRequestHandler):
         else:
             self.send_header("Content-Type", "application/txt")
             self.end_headers()
-            self.wfile.write(datetime.utcnow().isoformat().encode())
+            self.wfile.write(datetime.now(timezone.utc).isoformat().encode())
 
     def do_POST(self) -> None:  # pylint: disable=invalid-name
         """Handle POST requests
         DOES NOT WORK YET"""
-        message(f"POST @ {datetime.utcnow()}")
+        message(f"POST @ {datetime.now(timezone.utc)}")
         self.send_response(200)
         self.send_header("Content-Type", "application/txt")
         self.end_headers()
         if self.url.path == MODEL_PATH:
-            message(f"POST {self.url.path} @ {datetime.utcnow()}")
+            message(f"POST {self.url.path} @ {datetime.now(timezone.utc)}")
             if (
                 _ := JSONParent.model_validate_json(self.rfile.read().decode())
             ) is not None:
                 # assert False, "POST read content OK"
-                message(f"POST OK @ {datetime.utcnow()}")
+                message(f"POST OK @ {datetime.now(timezone.utc)}")
                 self.wfile.write("OK".encode())
                 # assert False, "POST did write"
             else:
                 # assert False, "POST read content ERROR"
-                message(f"POST ERROR @ {datetime.utcnow()}")
+                message(f"POST ERROR @ {datetime.now(datetime.timezone.utc)}")
                 self.wfile.write("ERROR".encode())
         # assert False, "do_POST()"
 
