@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-exportables"
-version = "1.1.2"
+version = "1.2"
 authors = [{ name = "Jylpah", email = "jylpah@gmail.com" }]
 description = "Python Pydantic BaseModel extension and helpers for easier import/export to different formats (JSON, CSV, TXT)"
 readme = "README.md"
@@ -25,6 +25,7 @@ dependencies = [
     "Deprecated>=1.2",
     "pydantic>=2.4",
     "pymongo>=4.6",
+    "result>=0.17.0",
     "pyutils @ git+https://github.com/Jylpah/pyutils.git@main-1.0",
 ]
 
@@ -92,7 +93,7 @@ pythonpath = "src" # avoid import path append in test files
 filterwarnings = [
     'ignore:Inheritance class ThrottledClientSession from ClientSession is discouraged:DeprecationWarning',
 ]
-
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.report]
 exclude_also = [
