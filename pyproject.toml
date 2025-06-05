@@ -24,6 +24,7 @@ dependencies = [
     "Brotli>=1.1",
     "Deprecated>=1.2",
     "multilevellogger",
+    "eventcounter>=0.4.2",
     "pydantic>=2.4",
     "pymongo>=4.6",
     "result>=0.17.0",
