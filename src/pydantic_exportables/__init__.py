@@ -31,6 +31,8 @@ from .utils import (
     get_model as get_model,
     get_model_res as get_model_res,
     str2path as str2path,
+    awrap as awrap,
+    epoch_now as epoch_now,
 )
 
 

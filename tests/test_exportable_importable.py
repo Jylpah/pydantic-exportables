@@ -19,10 +19,9 @@ from pydantic_exportables import (
     Importable,
     AliasMapper,
     PyObjectId,
+    awrap,
+    epoch_now,
 )
-
-from pyutils import awrap
-from pyutils.utils import epoch_now
 
 ########################################################
 #
