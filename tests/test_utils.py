@@ -21,7 +21,6 @@ from pydantic_exportables import (
     Importable,
     get_model,
     get_model_res,
-    awrap,
     epoch_now,
 )
 
