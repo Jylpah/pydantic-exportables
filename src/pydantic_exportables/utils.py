@@ -1,25 +1,25 @@
-import logging
-
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, AsyncGenerator, Iterable
 from aiohttp import ClientSession, ClientError
 from pydantic import BaseModel
 from pathlib import Path
 from asyncio import CancelledError, sleep
 from result import Ok, Err, Result
+from time import time
+from multilevellogger import getMultiLevelLogger, MultiLevelLogger
 
 # Setup logging
-logger = logging.getLogger(__name__)
+logger: MultiLevelLogger = getMultiLevelLogger(__name__)
 error = logger.error
-message = logger.warning
-verbose = logger.info
+message = logger.message
+verbose = logger.verbose
 debug = logger.debug
 
 # Constants
 MAX_RETRIES: int = 3
 SLEEP: float = 1
 
+M = TypeVar("M", bound=BaseModel)
 T = TypeVar("T")
-
 
 ##############################################
 #
@@ -28,7 +28,18 @@ T = TypeVar("T")
 ##############################################
 
 
-M = TypeVar("M", bound=BaseModel)
+async def awrap(iterable: Iterable[T]) -> AsyncGenerator[T, None]:
+    """awrap() is a async wrapper for Iterables
+
+    It converts an Iterable[T] to AsyncGenerator[T].
+    AsyncGenerator[T] is also AsyncIterable[T] allowing it to be used in async for
+    """
+    for item in iter(iterable):
+        yield item
+
+
+def epoch_now() -> int:
+    return int(time())
 
 
 def str2path(filename: str | Path, suffix: str | None = None) -> Path:

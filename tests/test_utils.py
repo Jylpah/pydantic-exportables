@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from socketserver import ThreadingMixIn
 from pydantic import BaseModel, Field
 from enum import StrEnum, IntEnum
-from pyutils.utils import epoch_now
+
 from pyutils import ThrottledClientSession
 from asyncio import sleep
 from result import Ok, Result
@@ -21,6 +21,8 @@ from pydantic_exportables import (
     Importable,
     get_model,
     get_model_res,
+    awrap,
+    epoch_now,
 )
 
 

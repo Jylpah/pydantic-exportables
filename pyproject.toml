@@ -23,6 +23,7 @@ dependencies = [
     "aiocsv>=1.2",
     "Brotli>=1.1",
     "Deprecated>=1.2",
+    "multilevellogger",
     "pydantic>=2.4",
     "pymongo>=4.6",
     "result>=0.17.0",
@@ -72,23 +73,26 @@ warn_required_dynamic_aliases = false
 warn_untyped_fields = true
 
 [tool.ruff]
-# line-length = 88
-include = ["pyproject.toml", "src/**/*.py", "tests/**/*.py"]
+include = ["pyproject.toml", "src/**/*.py", "tests/**/*.py", "demos/**/*.py"]
 indent-width = 4
 extend-include = ["*.ipynb"]
-extend-exclude = [".venv", ".vscode" ] 
-fixable = ["ALL"]
+extend-exclude = [".venv", ".vscode"]
+lint.fixable = ["ALL"]
+
 
 
 [tool.pyright]
 reportGeneralTypeIssues = false
 reportInvalidStringEscapeSequence = false
 typeCheckingMode = "off"
+include = ["src", "tests"]
+extraPaths = ["src"]
 
 
 [tool.pytest.ini_options]
 minversion = "7.4"
-addopts = "-v --cov=src"
+addopts = ["-v", "--cov=src"]
+testpaths = ["tests", "demos"]
 pythonpath = "src" # avoid import path append in test files
 filterwarnings = [
     'ignore:Inheritance class ThrottledClientSession from ClientSession is discouraged:DeprecationWarning',

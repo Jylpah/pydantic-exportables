@@ -14,7 +14,7 @@ from aiocsv.writers import AsyncDictWriter
 from csv import Dialect, excel
 from abc import abstractmethod
 
-from pyutils.eventcounter import EventCounter
+from eventcounter import EventCounter
 from .jsonexportable import JSONExportable
 from .csvexportable import CSVExportable
 from .utils import str2path
