@@ -369,9 +369,7 @@ class JSONExportableRootDict(
 ):
     """Pydantic RootModel baseclass for JSONExportable"""
 
-    root: Annotated[Dict[IdxType, JSONExportableType], Field(default_factory=dict)] = (
-        dict()
-    )
+    root: Annotated[Dict[IdxType, JSONExportableType], Field(default_factory=dict)]
 
     _sorted: bool = True  # sort items
 
