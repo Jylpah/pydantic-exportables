@@ -20,7 +20,6 @@ from typing import (
     Callable,
     Sequence,
     AsyncGenerator,
-    Annotated,
 )
 
 from aiofiles import open
@@ -369,7 +368,7 @@ class JSONExportableRootDict(
 ):
     """Pydantic RootModel baseclass for JSONExportable"""
 
-    root: Annotated[Dict[IdxType, JSONExportableType], Field(default_factory=dict)]
+    root: Dict[IdxType, JSONExportableType] = Field(default_factory=dict)
 
     _sorted: bool = True  # sort items
 
