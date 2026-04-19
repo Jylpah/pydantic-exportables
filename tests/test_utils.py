@@ -1,6 +1,5 @@
 import pytest  # type: ignore
 from datetime import datetime, timezone
-from itertools import pairwise, accumulate
 from functools import cached_property
 from typing import Generator
 from multiprocessing import Process
