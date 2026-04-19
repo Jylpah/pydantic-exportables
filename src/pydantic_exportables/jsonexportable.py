@@ -279,6 +279,11 @@ class JSONExportable(BaseModel):
         except NotImplementedError:
             return hash(id(self))
 
+    def __eq__(self, value: Any) -> bool:
+        if type(value) is type(self):
+            return self.model_dump() == value.model_dump()
+        return False
+
     def obj_db(self, fields: list[str] | None = None, **kwargs) -> dict:
         params: dict[str, Any] = {
             "exclude": self._exclude_export_DB_fields,
