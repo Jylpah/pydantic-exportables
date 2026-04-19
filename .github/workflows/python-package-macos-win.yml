@@ -36,8 +36,5 @@ jobs:
     - name: Test with pytest
       run: |
         uv run pytest --cov=src tests
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v6
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
 
