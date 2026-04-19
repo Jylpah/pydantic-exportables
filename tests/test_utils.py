@@ -214,7 +214,7 @@ async def _wait_for_server(
             except Exception:
                 pass
             await sleep(interval)
-    assert False, f"HTTP server did not become ready"
+    assert False, "HTTP server did not become ready in time"
 
 
 @pytest.fixture(scope="module")
