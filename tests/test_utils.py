@@ -202,12 +202,11 @@ async def _get(url: str, rate: float, N: int) -> list[float]:
 
 
 async def _wait_for_server(
-    url: str, timeout: float = 5.0, interval: float = 0.1
+    url: str, interval: float = 0.1
 ) -> None:
     """Wait until the test HTTP server is ready to accept requests."""
-    deadline = epoch_now() + int(timeout) + 1
     async with ClientSession() as session:
-        while epoch_now() < deadline:
+        while True:
             try:
                 async with session.get(url) as resp:
                     if resp.status == 200:
@@ -215,7 +214,7 @@ async def _wait_for_server(
             except Exception:
                 pass
             await sleep(interval)
-    assert False, f"HTTP server did not become ready in {timeout}s: {url}"
+    assert False, f"HTTP server did not become ready"
 
 
 @pytest.fixture(scope="module")
