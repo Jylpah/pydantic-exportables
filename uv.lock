@@ -278,20 +278,6 @@ wheels = [
 ]
 
 [[package]]
-name = "build"
-version = "1.4.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "os_name == 'nt'" },
-    { name = "packaging" },
-    { name = "pyproject-hooks" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3f/16/4b272700dea44c1d2e8ca963ebb3c684efe22b3eba8cfa31c5fdb60de707/build-1.4.3.tar.gz", hash = "sha256:5aa4231ae0e807efdf1fd0623e07366eca2ab215921345a2e38acdd5d0fa0a74", size = 89314, upload-time = "2026-04-10T21:25:40.857Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b2/30/f169e1d8b2071beaf8b97088787e30662b1d8fb82f8c0941d14678c0cbf1/build-1.4.3-py3-none-any.whl", hash = "sha256:1bc22b19b383303de8f2c8554c9a32894a58d3f185fe3756b0b20d255bee9a38", size = 26171, upload-time = "2026-04-10T21:25:39.671Z" },
-]
-
-[[package]]
 name = "certifi"
 version = "2026.2.25"
 source = { registry = "https://pypi.org/simple" }
@@ -1117,15 +1103,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pip-chill"
-version = "1.0.5"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1c/b6/bf36516940f5069384ae0908c5b8c334acf3a6b047471ef80dd9f1acf2ed/pip_chill-1.0.5.tar.gz", hash = "sha256:e79bc514abfe144f2ef52290f59677d279cb05b4084fa9f814bbe5cc0ea04c1c", size = 18498, upload-time = "2026-03-15T15:55:11.229Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/28/71/7f572eea37680aa1e37cbfc82a5cfb3cfc4cd8b0d8425c15e5723c4e4165/pip_chill-1.0.5-py3-none-any.whl", hash = "sha256:732fae3d695950f6e47ad849480fdfd0fb95fa2f2eed5d9c22354f44adad9f7b", size = 6653, upload-time = "2026-03-15T15:55:09.95Z" },
-]
-
-[[package]]
 name = "pluggy"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1449,21 +1426,6 @@ dependencies = [
     { name = "result" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "build" },
-    { name = "mypy" },
-    { name = "pip-chill" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-datafiles" },
-    { name = "pytest-timeout" },
-    { name = "ruff" },
-    { name = "types-aiofiles" },
-    { name = "types-deprecated" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "codecov-cli" },
@@ -1487,25 +1449,13 @@ requires-dist = [
     { name = "aiofiles", specifier = ">=23.1" },
     { name = "aiohttp", specifier = ">=3.9.1" },
     { name = "brotli", specifier = ">=1.1" },
-    { name = "build", marker = "extra == 'dev'", specifier = ">=0.10" },
     { name = "deprecated", specifier = ">=1.2" },
     { name = "eventcounter", specifier = ">=0.4.2" },
     { name = "multilevellogger" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.2" },
-    { name = "pip-chill", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "pydantic", specifier = ">=2.4" },
     { name = "pymongo", specifier = ">=4.6" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1" },
-    { name = "pytest-datafiles", marker = "extra == 'dev'" },
-    { name = "pytest-timeout", marker = "extra == 'dev'" },
     { name = "result", specifier = ">=0.17.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.9" },
-    { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=23.1" },
-    { name = "types-deprecated", marker = "extra == 'dev'", specifier = ">=1.2" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1590,15 +1540,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/15/c7/b5337093bb01da852f945802328665f85f8109dbe91d81ea2afe5ff059b9/pymongo-4.16.0-cp314-cp314t-win32.whl", hash = "sha256:948152b30eddeae8355495f9943a3bf66b708295c0b9b6f467de1c620f215487", size = 1040560, upload-time = "2026-01-07T18:05:23.888Z" },
     { url = "https://files.pythonhosted.org/packages/96/8c/5b448cd1b103f3889d5713dda37304c81020ff88e38a826e8a75ddff4610/pymongo-4.16.0-cp314-cp314t-win_amd64.whl", hash = "sha256:f6e42c1bc985d9beee884780ae6048790eb4cd565c46251932906bdb1630034a", size = 1075081, upload-time = "2026-01-07T18:05:26.874Z" },
     { url = "https://files.pythonhosted.org/packages/32/cd/ddc794cdc8500f6f28c119c624252fb6dfb19481c6d7ed150f13cf468a6d/pymongo-4.16.0-cp314-cp314t-win_arm64.whl", hash = "sha256:6b2a20edb5452ac8daa395890eeb076c570790dfce6b7a44d788af74c2f8cf96", size = 1047725, upload-time = "2026-01-07T18:05:28.47Z" },
-]
-
-[[package]]
-name = "pyproject-hooks"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e7/82/28175b2414effca1cdac8dc99f76d660e7a4fb0ceefa4b4ab8f5f6742925/pyproject_hooks-1.2.0.tar.gz", hash = "sha256:1e859bd5c40fae9448642dd871adf459e5e2084186e8d2c2a79a824c970da1f8", size = 19228, upload-time = "2024-09-29T09:24:13.293Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/24/12818598c362d7f300f18e74db45963dbcb85150324092410c8b49405e42/pyproject_hooks-1.2.0-py3-none-any.whl", hash = "sha256:9e5c6bfa8dcc30091c74b0cf803c81fdd29d94f01992a7707bc97babb1141913", size = 10216, upload-time = "2024-09-29T09:24:11.978Z" },
 ]
 
 [[package]]

@@ -30,7 +30,7 @@ verbose = logger.info
 debug = logger.debug
 
 
-HOST: str = "localhost"
+HOST: str = "127.0.0.1"
 PORT: int = 8889
 MODEL_PATH: str = "/JSONParent"
 
@@ -201,6 +201,23 @@ async def _get(url: str, rate: float, N: int) -> list[float]:
     return timings
 
 
+async def _wait_for_server(
+    url: str, timeout: float = 5.0, interval: float = 0.1
+) -> None:
+    """Wait until the test HTTP server is ready to accept requests."""
+    deadline = epoch_now() + int(timeout) + 1
+    async with ClientSession() as session:
+        while epoch_now() < deadline:
+            try:
+                async with session.get(url) as resp:
+                    if resp.status == 200:
+                        return
+            except Exception:
+                pass
+            await sleep(interval)
+    assert False, f"HTTP server did not become ready in {timeout}s: {url}"
+
+
 @pytest.fixture(scope="module")
 def server_host() -> str:
     return HOST
@@ -238,7 +255,7 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
     """Test get_url_model()"""
     N: int = N_SLOW
     url: str = server_url + model_path
-    await sleep(2)  # wait for the slow GH instances to start HTTPserver...
+    await _wait_for_server(url)
     async with ClientSession() as session:
         for _ in range(N):
             if (
@@ -261,7 +278,7 @@ async def test_2_get_model_res(server_url: str, model_path: str) -> None:
     N: int = N_SLOW
     url: str = server_url + model_path
     res: Result[JSONParent | None, tuple[int, str]]
-    await sleep(2)  # wait for the slow GH instances to start HTTPserver...
+    await _wait_for_server(url)
     async with ClientSession() as session:
         for _ in range(N):
             if isinstance(
