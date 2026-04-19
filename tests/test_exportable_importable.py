@@ -126,7 +126,7 @@ class IntIdxExportableDict(JSONExportableRootDict[int, JSONIntIdxExportable]):
 
 
 class ObjectIdExportable(JSONExportable):
-    id: Annotated[PyObjectId, Field(default_factory=ObjectId)] = PyObjectId()
+    id: PyObjectId = Field(default_factory=PyObjectId)
     name: str = Field(default=..., alias="n")
 
     @property

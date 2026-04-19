@@ -9,8 +9,7 @@ from urllib.parse import urlparse
 from socketserver import ThreadingMixIn
 from pydantic import BaseModel, Field
 from enum import StrEnum, IntEnum
-
-from pyutils import ThrottledClientSession
+from aiohttp import ClientSession
 from asyncio import sleep
 from result import Ok, Result
 import logging
@@ -35,8 +34,8 @@ debug = logger.debug
 HOST: str = "localhost"
 PORT: int = 8889
 MODEL_PATH: str = "/JSONParent"
-RATE_FAST: float = 100
-RATE_SLOW: float = 0.6
+#RATE_FAST: float = 100
+#RATE_SLOW: float = 0.6
 
 N_FAST: int = 500
 N_SLOW: int = 5
@@ -176,29 +175,29 @@ class _HttpServer(Process):
         server.serve_forever()
 
 
-def max_rate(timings: list[float], rate: float) -> float:
-    """Read list[datetime] and return number of timings,
-    average rate and maximum rate"""
-    assert rate > 0, f"rate must be positive: {rate}"
-    diffs: list[float] = [x1 - x0 for (x0, x1) in pairwise(timings)]
-    cums: list[float] = [0] + list(accumulate(diffs))
-    window: int = max(int(rate) - 1, 1)
-    min_time: float = min(
-        [cums[i + window] - cums[i] for i in range(len(cums) - window)]
-    )
-    return (window) / min_time
+# def max_rate(timings: list[float], rate: float) -> float:
+#     """Read list[datetime] and return number of timings,
+#     average rate and maximum rate"""
+#     assert rate > 0, f"rate must be positive: {rate}"
+#     diffs: list[float] = [x1 - x0 for (x0, x1) in pairwise(timings)]
+#     cums: list[float] = [0] + list(accumulate(diffs))
+#     window: int = max(int(rate) - 1, 1)
+#     min_time: float = min(
+#         [cums[i + window] - cums[i] for i in range(len(cums) - window)]
+#     )
+#     return (window) / min_time
 
 
-def avg_rate(timings: list[float]) -> float:
-    n: int = len(timings) - 1  # the last request is not measured in total
-    total: float = timings[-1] - timings[0]
-    return n / total
+# def avg_rate(timings: list[float]) -> float:
+#     n: int = len(timings) - 1  # the last request is not measured in total
+#     total: float = timings[-1] - timings[0]
+#     return n / total
 
 
 async def _get(url: str, rate: float, N: int) -> list[float]:
     """Test timings of N/sec get"""
     timings: list[float] = list()
-    async with ThrottledClientSession(rate_limit=rate) as session:
+    async with ClientSession() as session:
         for _ in range(N):
             async with session.get(url, ssl=False) as resp:
                 assert resp.status == 200, f"request failed, HTTP STATUS={resp.status}"
@@ -241,11 +240,10 @@ def model_path() -> str:
 @pytest.mark.asyncio
 async def test_1_get_model(server_url: str, model_path: str) -> None:
     """Test get_url_model()"""
-    rate_limit: float = RATE_FAST
     N: int = N_SLOW
     url: str = server_url + model_path
     await sleep(2)  # wait for the slow GH instances to start HTTPserver...
-    async with ThrottledClientSession(rate_limit=rate_limit) as session:
+    async with ClientSession() as session:
         for _ in range(N):
             if (
                 _ := await get_model(
@@ -253,6 +251,7 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
                 )
             ) is None:
                 assert False, "get_url_model() returned None"
+            await sleep(0.1)
 
 
 @pytest.mark.skipif(
@@ -263,12 +262,11 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
 @pytest.mark.asyncio
 async def test_2_get_model_res(server_url: str, model_path: str) -> None:
     """Test get_url_model_REs()"""
-    rate_limit: float = RATE_FAST
     N: int = N_SLOW
     url: str = server_url + model_path
     res: Result[JSONParent | None, tuple[int, str]]
     await sleep(2)  # wait for the slow GH instances to start HTTPserver...
-    async with ThrottledClientSession(rate_limit=rate_limit) as session:
+    async with ClientSession() as session:
         for _ in range(N):
             if isinstance(
                 res := await get_model_res(
@@ -284,3 +282,4 @@ async def test_2_get_model_res(server_url: str, model_path: str) -> None:
                 reason: str
                 status, reason = res.err_value
                 assert False, f"get_url_model() returned error: {status}/{reason}"
+            await sleep(0.2)
