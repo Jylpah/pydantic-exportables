@@ -33,7 +33,8 @@ from pydantic import (
     ConfigDict,
     Field,
 )
-from deprecated import deprecated
+
+# from deprecated import deprecated
 from .pyobjectid import PyObjectId
 
 from .utils import str2path
@@ -249,31 +250,34 @@ class JSONExportable(BaseModel):
         """return backend index"""
         raise NotImplementedError
 
-    # TODO: Create a Protocol and move implementation to blitz-stats
-    @property
-    @deprecated(version="1.1.2", reason="Will removed in 1.4")
-    def indexes(self) -> dict[str, Idx]:
-        """return backend indexes"""
-        raise NotImplementedError
+    # # TODO: Create a Protocol and move implementation to blitz-stats
+    # @property
+    # @deprecated(version="1.1.2", reason="Will removed in 1.4")
+    # def indexes(self) -> dict[str, Idx]:
+    #     """return backend indexes"""
+    #     raise NotImplementedError
 
-    # TODO: Create a Protocol and move implementation to blitz-stats
-    @classmethod
-    @deprecated(version="1.1.2", reason="Will removed in 1.4")
-    def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
-        """return backend search indexes"""
-        raise NotImplementedError
+    # # TODO: Create a Protocol and move implementation to blitz-stats
+    # @classmethod
+    # @deprecated(version="1.1.2", reason="Will removed in 1.4")
+    # def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
+    #     """return backend search indexes"""
+    #     raise NotImplementedError
 
-    # TODO: Create a Protocol and move implementation to blitz-stats
-    @classmethod
-    @deprecated(version="1.1.2", reason="Will removed in 1.4")
-    def example_instance(cls) -> Self:
-        """return a example instance of the class"""
-        if len(cls._example) > 0:
-            return cls.model_validate_json(cls._example)
-        raise NotImplementedError
+    # # TODO: Create a Protocol and move implementation to blitz-stats
+    # @classmethod
+    # @deprecated(version="1.1.2", reason="Will removed in 1.4")
+    # def example_instance(cls) -> Self:
+    #     """return a example instance of the class"""
+    #     if len(cls._example) > 0:
+    #         return cls.model_validate_json(cls._example)
+    #     raise NotImplementedError
 
     def __hash__(self) -> int:
-        """Make object hashable using index fields if defined"""
+        """
+        Make object hashable using index field if defined.
+        Otherwise use whole object JSON representation.
+        """
         try:
             return hash(self.index)
         except NotImplementedError:
@@ -446,7 +450,6 @@ class JSONExportableRootDict(
             self.root[key] = new[key]
 
         return (added, updated_idx)
-
 
     def json_src(self, **kwargs) -> str:
         """ """
