@@ -244,30 +244,28 @@ class JSONExportable(BaseModel):
         params.update(kwargs)
         return params
 
-    # TODO: Create a Protocol and move implementation to blitz-stats
     @property
-    @deprecated(version="1.1.2", reason="Will removed in 1.3")
     def index(self) -> Idx:
         """return backend index"""
         raise NotImplementedError
 
     # TODO: Create a Protocol and move implementation to blitz-stats
     @property
-    @deprecated(version="1.1.2", reason="Will removed in 1.3")
+    @deprecated(version="1.1.2", reason="Will removed in 1.4")
     def indexes(self) -> dict[str, Idx]:
         """return backend indexes"""
         raise NotImplementedError
 
     # TODO: Create a Protocol and move implementation to blitz-stats
     @classmethod
-    @deprecated(version="1.1.2", reason="Will removed in 1.3")
+    @deprecated(version="1.1.2", reason="Will removed in 1.4")
     def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
         """return backend search indexes"""
         raise NotImplementedError
 
     # TODO: Create a Protocol and move implementation to blitz-stats
     @classmethod
-    @deprecated(version="1.1.2", reason="Will removed in 1.3")
+    @deprecated(version="1.1.2", reason="Will removed in 1.4")
     def example_instance(cls) -> Self:
         """return a example instance of the class"""
         if len(cls._example) > 0:
@@ -444,15 +442,6 @@ class JSONExportableRootDict(
 
         return (added, updated_idx)
 
-    # def update(self, new: Self, match_index: bool = True) -> bool:
-    #     """
-    #     update() with JSONExportable.update() signature. Calls update_items()
-    #     and returns True if an update was made
-    #     """
-    #     added: set[Idx]
-    #     updated: set[Idx]
-    #     added, updated = self.update_items(new=new, match_index=match_index)
-    #     return len(added) > 0 or len(updated) > 0
 
     def json_src(self, **kwargs) -> str:
         """ """
