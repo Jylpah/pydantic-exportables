@@ -62,10 +62,10 @@ class JSONChild(JSONExportable):
         """return backend index"""
         return self.name
 
-    @property
-    def indexes(self) -> dict[str, Idx]:
-        """return backend indexes"""
-        return {"name": self.index}
+    # @property
+    # def indexes(self) -> dict[str, Idx]:
+    #     """return backend indexes"""
+    #     return {"name": self.index}
 
 
 class JSONParent(JSONExportable, Importable):
@@ -82,10 +82,10 @@ class JSONParent(JSONExportable, Importable):
         """return backend index"""
         return self.name
 
-    @property
-    def indexes(self) -> dict[str, Idx]:
-        """return backend indexes"""
-        return {"name": self.index}
+    # @property
+    # def indexes(self) -> dict[str, Idx]:
+    #     """return backend indexes"""
+    #     return {"name": self.index}
 
 
 class JSONAdult(JSONExportable):
@@ -504,10 +504,18 @@ def test_5_jsonexportable_transform_fails(json_parents: List[JSONParent]):
     )
 
 
-def test_6_parse_str_fails(json_parents: List[JSONParent]):
+def test_6_parse_str(json_parents: List[JSONParent]):
     for parent in json_parents:
+        # test failure
         assert (_ := JSONAdult.parse_str(parent.json_src())) is None, (
             f"parse_str() returned instance from faulty data: {parent.json_src()}"
+        )
+        # test success
+        json_str: str = parent.json_src()
+        parsed: JSONParent | None = JSONParent.parse_str(json_str)
+        assert parsed is not None, f"parse_str() failed to parse valid JSON: {json_str}"
+        assert parsed == parent, (
+            f"parse_str() returned different object than original: {parsed} != {parent}"
         )
 
 
@@ -574,8 +582,212 @@ def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
     )
 
 
+def test_8_export_helper_edge_cases():
+    parent = JSONParent(
+        name="Test",
+        years=25,
+        married=True,
+        array=["a", "b"],
+        child=JSONChild(name="Kid"),
+    )
+
+    # Test with both include and exclude in kwargs
+    result = parent._export_helper({"exclude": ["child"]}, exclude={"array"})
+    assert "child" not in result["exclude"], (
+        "exclude parameter should be passed to export_helper"
+    )
+    assert "array" in result["exclude"], (
+        "exclude parameter should be passed to export_helper"
+    )
+
+    # Test with fields parameter
+    result: dict = parent._export_helper({"exclude": set()}, fields=["name", "years"])
+    assert result["include"] == {"name": True, "years": True}
+    assert not result["exclude_defaults"], (
+        f"exclude_defaults should be False when fields are provided, but got {result['exclude_defaults']}"
+    )
+    assert not result["exclude_unset"], (
+        f"exclude_unset should be False when fields are provided, but got {result['exclude_unset']}"
+    )
+    assert not result["exclude_none"], (
+        f"exclude_none should be False when fields are provided, but got {result['exclude_none']}"
+    )
+
+
+def test_9_from_obj_validation_error():
+    invalid_data: dict[str, str] = {"name": "Test", "years": "not_a_number"}
+    assert JSONParent.from_obj(invalid_data) is None, (
+        "from_obj() should return None for invalid data"
+    )
+
+
+def test_10_transform_exception_handling():
+    # Register a transformation that raises an exception
+    def failing_transform(obj):
+        raise ValueError("Test error")
+
+    JSONParent.register_transformation(str, failing_transform)
+    assert JSONParent.transform("test_string") is None, "transform() failed"
+
+
+def test_11_index_property(json_parents):
+    for parent in json_parents:
+        assert isinstance(parent.index, (str, int, PyObjectId))
+        assert parent.index == parent.name  # Based on implementation
+
+
+def test_12_PyObjectIdasIdx() -> None:
+    d = ObjectIdExportableDict()
+
+    L: int = 10
+    for i in range(L):
+        d.add(ObjectIdExportable(id=ObjectId(), name=f"Name {i}"))
+
+    debug(d.json_src(exclude_defaults=False))
+    assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
+
+    assert (imported := ObjectIdExportableDict.parse_str(d.json_src())) is not None, (
+        "could not parse exported JSON"
+    )
+    assert len(imported) == len(d), (
+        f"the size of the imported 'ObjectIdExportableDict' does not match the exporterd: {len(imported)} != {len(d)}"
+    )
+
+    for key, value in imported.items():
+        assert isinstance(key, ObjectId), (
+            f"the imported keys are not type of ObjectId, but {type(key)}"
+        )
+        assert isinstance(value.index, ObjectId), (
+            f"imported objects 'id' field is {type(value.index)}, not ObjectId"
+        )
+
+    d = ObjectIdExportableDict()
+
+    for i in range(L):
+        d.add(ObjectIdExportable(name=f"Name {i}"))
+
+    debug(d)
+    assert len(d) == L, (
+        f"could not add all the items with generated ObjectId: {len(d)} != {L}"
+    )
+
+
 @pytest.mark.asyncio
-async def test_8_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
+async def test_13_IntasIdx(tmp_path: Path) -> None:
+    d = IntIdxExportableDict()
+    export_fn: Path = tmp_path / "test_13_IntasIdx.json"
+    L: int = 20
+    for i in range(L):
+        d.add(JSONIntIdxExportable(idx=i))
+
+    debug(d.json_src(exclude_defaults=False))
+    assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
+    assert await d.save_json(export_fn) > 0, (
+        "could not export IntIdxExportableDict to JSON"
+    )
+
+    assert (imported := await IntIdxExportableDict.open_json(export_fn)) is not None, (
+        "could not import IntIdxExportableDict from JSON"
+    )
+
+    assert len(imported) == len(d), (
+        f"the imported object has incorrect number of objects: {len(imported)} != {len(d)}"
+    )
+
+    for key, value in imported.items():
+        assert isinstance(key, int), f"imported key is not type 'int', but {type(key)}"
+        assert isinstance(value.index, int), (
+            f"imported objects 'id' field is {type(value.index)}, not int"
+        )
+
+
+def test_14_jsonexportable_hash():
+    parent1 = JSONParent(name="Alice", years=30)
+    parent2 = JSONParent(name="Alice", years=35)
+    parent3 = JSONParent(name="Bob", years=30)
+
+    # Same index should have same hash
+    assert hash(parent1) == hash(parent2), (
+        "__hash__() failed: same index should have same hash"
+    )
+    # Different index should have different hash
+    assert hash(parent1) != hash(parent3), (
+        "__hash__() failed: different index should have different hash"
+    )
+
+    # Can be used in sets
+    parent_set = {parent1, parent2, parent3}
+    assert len(parent_set) == 3, (
+        "__hash__() failed: hashable objects should still be distinguished by identity when __eq__ is not overridden"
+    )
+
+
+@pytest.mark.asyncio
+async def test_15_import_json(tmp_path: Path, json_parents: list[JSONParent]):
+    fn: Path = tmp_path / "multi.json"
+
+    # Write multiple JSON lines
+    content: str = "\n".join(parent.json_src() for parent in json_parents)
+    with open(fn, "w") as f:
+        f.write(content)
+
+    # Import and verify
+    imported: list[JSONParent] = []
+    async for item in JSONParent.import_json(fn):
+        imported.append(item)
+
+    assert len(imported) == len(json_parents)
+    for original, imported_item in zip(json_parents, imported):
+        assert original == imported_item
+
+
+@pytest.mark.asyncio
+async def test_16_async_error_handling(tmp_path: Path, json_parents: List[JSONParent]):
+    # Test open_json with invalid JSON
+    invalid_fn: Path = tmp_path / "invalid.json"
+    with open(invalid_fn, "w") as f:
+        f.write("invalid json content")
+
+    assert await JSONParent.open_json(invalid_fn) is None, (
+        "open_json() should return None for invalid JSON content"
+    )
+
+    # Test import_json with invalid lines
+    mixed_fn: Path = tmp_path / "mixed.json"
+    valid_json: str = json_parents[0].json_src()
+    with open(mixed_fn, "w") as f:
+        f.write(f"{valid_json}\ninvalid line\n{valid_json}")
+
+    imported: list[JSONParent] = []
+    async for item in JSONParent.import_json(mixed_fn):
+        imported.append(item)
+
+    assert len(imported) == 2, (
+        f"Expected 2 valid items, but got {len(imported)}"
+    )  # Only valid lines imported
+
+
+@pytest.mark.asyncio
+async def test_17_jsonexportablerootdict_save_open_json(tmp_path, json_parents):
+    family = JSONNeighbours()
+    for parent in json_parents:
+        family.add(parent)
+
+    fn = tmp_path / "family.json"
+
+    # Test save_json
+    assert await family.save_json(fn) > 0
+
+    # Test open_json
+    loaded = await JSONNeighbours.open_json(fn)
+    assert loaded is not None
+    assert len(loaded) == len(family)
+    for key in family:
+        assert loaded[key] == family[key]
+
+
+@pytest.mark.asyncio
+async def test_18_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
     fn: Path = tmp_path / "export.txt"
 
     await export(awrap(txt_data), "txt", filename="-")  # type: ignore
@@ -605,7 +817,7 @@ async def test_8_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPer
 
 
 @pytest.mark.asyncio
-async def test_9_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
+async def test_19_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
     fn: Path = tmp_path / "export.csv"
 
     await export(awrap(csv_data), "csv", filename="-")  # type: ignore
@@ -643,68 +855,3 @@ async def test_9_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPer
     assert len(csv_data) == 0, (
         f"could not import all the data correctly: {len(csv_data)} != 0"
     )
-
-
-def test_10_PyObjectIdasIdx() -> None:
-    d = ObjectIdExportableDict()
-
-    L: int = 10
-    for i in range(L):
-        d.add(ObjectIdExportable(id=ObjectId(), name=f"Name {i}"))
-
-    debug(d.json_src(exclude_defaults=False))
-    assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
-
-    assert (imported := ObjectIdExportableDict.parse_str(d.json_src())) is not None, (
-        "could not parse exported JSON"
-    )
-    assert len(imported) == len(d), (
-        f"the size of the imported 'ObjectIdExportableDict' does not match the exporterd: {len(imported)} != {len(d)}"
-    )
-
-    for key, value in imported.items():
-        assert isinstance(key, ObjectId), (
-            f"the imported keys are not type of ObjectId, but {type(key)}"
-        )
-        assert isinstance(value.index, ObjectId), (
-            f"imported objects 'id' field is {type(value.index)}, not ObjectId"
-        )
-
-    d = ObjectIdExportableDict()
-
-    for i in range(L):
-        d.add(ObjectIdExportable(name=f"Name {i}"))
-
-    debug(d)
-    assert len(d) == L, (
-        f"could not add all the items with generated ObjectId: {len(d)} != {L}"
-    )
-
-
-@pytest.mark.asyncio
-async def test_11_IntasIdx(tmp_path: Path) -> None:
-    d = IntIdxExportableDict()
-    export_fn: Path = tmp_path / "test_11_IntasIdx.json"
-    L: int = 20
-    for i in range(L):
-        d.add(JSONIntIdxExportable(idx=i))
-
-    debug(d.json_src(exclude_defaults=False))
-    assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
-    assert await d.save_json(export_fn) > 0, (
-        "could not export IntIdxExportableDict to JSON"
-    )
-
-    assert (imported := await IntIdxExportableDict.open_json(export_fn)) is not None, (
-        "could not import IntIdxExportableDict from JSON"
-    )
-
-    assert len(imported) == len(d), (
-        f"the imported object has incorrect number of objects: {len(imported)} != {len(d)}"
-    )
-
-    for key, value in imported.items():
-        assert isinstance(key, int), f"imported key is not type 'int', but {type(key)}"
-        assert isinstance(value.index, int), (
-            f"imported objects 'id' field is {type(value.index)}, not int"
-        )
