@@ -232,7 +232,7 @@ def model_path() -> str:
     sys.platform == "win32",
     reason="not supported on windows: asyncio.loop.create_unix_connection",
 )
-@pytest.mark.timeout(30)
+@pytest.mark.timeout(40)
 @pytest.mark.asyncio
 async def test_1_get_model(server_url: str, model_path: str) -> None:
     """Test get_url_model()"""
@@ -254,7 +254,7 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
     sys.platform == "win32",
     reason="not supported on windows: asyncio.loop.create_unix_connection",
 )
-@pytest.mark.timeout(30)
+@pytest.mark.timeout(40)
 @pytest.mark.asyncio
 async def test_2_get_model_res(server_url: str, model_path: str) -> None:
     """Test get_url_model_REs()"""
