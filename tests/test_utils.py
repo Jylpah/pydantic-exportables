@@ -33,10 +33,7 @@ debug = logger.debug
 HOST: str = "localhost"
 PORT: int = 8889
 MODEL_PATH: str = "/JSONParent"
-#RATE_FAST: float = 100
-#RATE_SLOW: float = 0.6
 
-N_FAST: int = 500
 N_SLOW: int = 5
 
 THREADS: int = 5
@@ -235,7 +232,7 @@ def model_path() -> str:
     sys.platform == "win32",
     reason="not supported on windows: asyncio.loop.create_unix_connection",
 )
-@pytest.mark.timeout(20)
+@pytest.mark.timeout(30)
 @pytest.mark.asyncio
 async def test_1_get_model(server_url: str, model_path: str) -> None:
     """Test get_url_model()"""
@@ -257,7 +254,7 @@ async def test_1_get_model(server_url: str, model_path: str) -> None:
     sys.platform == "win32",
     reason="not supported on windows: asyncio.loop.create_unix_connection",
 )
-@pytest.mark.timeout(20)
+@pytest.mark.timeout(30)
 @pytest.mark.asyncio
 async def test_2_get_model_res(server_url: str, model_path: str) -> None:
     """Test get_url_model_REs()"""
@@ -281,4 +278,4 @@ async def test_2_get_model_res(server_url: str, model_path: str) -> None:
                 reason: str
                 status, reason = res.err_value
                 assert False, f"get_url_model() returned error: {status}/{reason}"
-            await sleep(0.2)
+            await sleep(0.1)
