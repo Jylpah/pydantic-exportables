@@ -15,7 +15,7 @@ from csv import Dialect, excel
 from abc import abstractmethod
 
 from eventcounter import EventCounter
-from .jsonexportable import JSONExportable
+from .jsonexportable import JSONExportable, export_json
 from .csvexportable import CSVExportable
 from .utils import str2path
 
@@ -68,8 +68,6 @@ async def export_csv(
 ) -> EventCounter:
     """Export data to a CSVfile"""
     debug("starting")
-    # assert isinstance(Q, Queue), "Q has to be type of asyncio.Queue[CSVExportable]"
-    # assert type(filename) is str and len(filename) > 0, "filename has to be str"
     stats: EventCounter = EventCounter("export CSV")
 
     dialect: Type[Dialect] = excel
@@ -142,55 +140,6 @@ async def export_csv(
         except Exception as err:
             error(f"error exporting to CSV: {err}")
             raise
-    return stats
-
-
-async def export_json(
-    iterable: AsyncIterable[JSONExportable],
-    filename: Path | str,
-    force: bool = False,
-    append: bool = False,
-) -> EventCounter:
-    """Export data to a JSON file"""
-    # assert type(filename) is str and len(filename) > 0, "filename has to be str"
-    stats: EventCounter = EventCounter("export JSON")
-    try:
-        exportable: JSONExportable
-        if isinstance(filename, str) and filename == "-":  # STDOUT
-            async for exportable in iterable:
-                try:
-                    print(exportable.json_src(indent=4))
-                    stats.log("rows")
-                except CancelledError:
-                    raise
-                except Exception as err:
-                    error(f"error exporting JSON type={type(exportable)}: {err}")
-                    stats.log("errors")
-        else:  # FILE
-            filename = str2path(filename, ".json")
-            if filename.is_file() and (not (force or append)):
-                raise FileExistsError(f"Cannot export to {filename}")
-            mode: Literal["w", "a"] = "a" if append else "w"
-
-            debug("opening %s for writing in mode=%s", str(filename), mode)
-            async with open(filename, mode=mode) as txtfile:
-                async for exportable in iterable:
-                    try:
-                        debug("writing JSON: %s", exportable.json_src())
-                        await txtfile.write(exportable.json_src() + linesep)
-                        stats.log("rows")
-                    except CancelledError:
-                        raise
-                    except Exception as err:
-                        error(f"{err}")
-                        stats.log("errors")
-
-    except CancelledError:
-        debug("Cancelled")
-        raise
-    except Exception as err:
-        error(f"error exporting to JSON: {err}")
-        raise
     return stats
 
 
