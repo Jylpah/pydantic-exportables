@@ -91,6 +91,7 @@ exclude_also = [
 
 [dependency-groups]
 dev = [
+    "ipython>=9.10.1",
     "mypy>=1.20.1",
     "pydantic>=2.13.2",
     "pytest>=9.0.3",
