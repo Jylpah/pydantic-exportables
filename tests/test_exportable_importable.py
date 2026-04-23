@@ -68,7 +68,7 @@ B = TypeVar("B", bound=BaseModel)
 
 
 async def open_json(
-    model: B, filename: Path | str, exceptions: bool = False
+    model: type[B], filename: Path | str, exceptions: bool = False
 ) -> B | None:
     """Open replay JSON file and return class instance"""
     try:
@@ -85,7 +85,9 @@ async def open_json(
     return None
 
 
-async def save_json(obj: JSONExportable, filename: Path | str) -> int:
+async def save_json(
+    obj: JSONExportable | JSONExportableRootDict, filename: Path | str
+) -> int:
     """Save object JSON into a file"""
     filename = str2path(filename)
     #
@@ -691,7 +693,7 @@ def test_5_jsonexportable_transform_fails(json_parents: List[JSONParent]):
     )
 
 
-def test_6_parse_str(json_parents: List[JSONParent]):
+def test_6_parse_str(json_parents: List[JSONParent]) -> None:
     for parent in json_parents:
         # test failure
         assert (_ := JSONAdult.parse_str(parent.json_src())) is None, (
@@ -706,7 +708,7 @@ def test_6_parse_str(json_parents: List[JSONParent]):
         )
 
 
-def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
+def test_7_jsonexportablerootdict(json_parents: List[JSONParent]) -> None:
     family = JSONNeighbours()
     for parent in json_parents:
         family.add(parent)
@@ -769,7 +771,7 @@ def test_7_jsonexportablerootdict(json_parents: List[JSONParent]):
     )
 
 
-def test_8_export_helper_edge_cases():
+def test_8_export_helper_edge_cases() -> None:
     parent = JSONParent(
         name="Test",
         years=25,
@@ -779,7 +781,7 @@ def test_8_export_helper_edge_cases():
     )
 
     # Test with both include and exclude in kwargs
-    result = parent._export_helper({"exclude": ["child"]}, exclude={"array"})
+    result: dict = parent._export_helper({"exclude": ["child"]}, exclude={"array"})
     assert "child" not in result["exclude"], (
         "exclude parameter should be passed to export_helper"
     )
@@ -788,7 +790,7 @@ def test_8_export_helper_edge_cases():
     )
 
     # Test with fields parameter
-    result: dict = parent._export_helper({"exclude": set()}, fields=["name", "years"])
+    result = parent._export_helper({"exclude": set()}, fields=["name", "years"])
     assert result["include"] == {"name": True, "years": True}
     assert not result["exclude_defaults"], (
         f"exclude_defaults should be False when fields are provided, but got {result['exclude_defaults']}"
@@ -801,14 +803,14 @@ def test_8_export_helper_edge_cases():
     )
 
 
-def test_9_from_obj_validation_error():
+def test_9_from_obj_validation_error() -> None:
     invalid_data: dict[str, str] = {"name": "Test", "years": "not_a_number"}
     assert JSONParent.from_obj(invalid_data) is None, (
         "from_obj() should return None for invalid data"
     )
 
 
-def test_10_transform_exception_handling():
+def test_10_transform_exception_handling() -> None:
     # Register a transformation that raises an exception
     def failing_transform(obj):
         raise ValueError("Test error")
@@ -817,7 +819,7 @@ def test_10_transform_exception_handling():
     assert JSONParent.transform("test_string") is None, "transform() failed"
 
 
-def test_11_index_property(json_parents):
+def test_11_index_property(json_parents) -> None:
     for parent in json_parents:
         assert isinstance(parent.index, (str, int, PyObjectId))
         assert parent.index == parent.name  # Based on implementation
