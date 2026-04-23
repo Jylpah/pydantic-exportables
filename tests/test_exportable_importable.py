@@ -17,10 +17,10 @@ from pydantic_exportables import (
     #  export,
     #  export_json,
     Idx,
-    CSVExportable,
-    TXTExportable,
-    TXTImportable,
-    Importable,
+    # CSVExportable,
+    # TXTExportable,
+    # TXTImportable,
+    # Importable,
     AliasMapper,
     PyObjectId,
     #    awrap,
@@ -152,7 +152,7 @@ class JSONChild(JSONExportable):
     #     return {"name": self.index}
 
 
-class JSONParent(JSONExportable, Importable):
+class JSONParent(JSONExportable):
     name: str = Field(alias="n")
     years: int = Field(default=37, alias="y")
     married: bool = Field(default=True, alias="m")
@@ -236,51 +236,51 @@ def datetime2str(dt: datetime) -> str:
     return dt.date().isoformat()
 
 
-class TXTPerson(TXTExportable, TXTImportable, CSVExportable, Importable):
-    name: str = Field(default=...)
-    age: int = Field(default=...)
-    height: float = Field(default=...)
-    birthday: datetime = Field(default_factory=today)
-    woman: bool = Field(default=False)
-    hair: Hair = Field(default=Hair.brown)
-    eyes: Eyes = Field(default=Eyes.blue)
+# class TXTPerson(TXTExportable, TXTImportable, CSVExportable, Importable):
+#     name: str = Field(default=...)
+#     age: int = Field(default=...)
+#     height: float = Field(default=...)
+#     birthday: datetime = Field(default_factory=today)
+#     woman: bool = Field(default=False)
+#     hair: Hair = Field(default=Hair.brown)
+#     eyes: Eyes = Field(default=Eyes.blue)
 
-    _csv_custom_readers = {"birthday": str2datetime}
-    _csv_custom_writers = {"birthday": datetime2str}
+#     _csv_custom_readers = {"birthday": str2datetime}
+#     _csv_custom_writers = {"birthday": datetime2str}
 
-    def txt_row(self, format: str = "") -> str:
-        """export data as single row of text"""
-        return f"{self.name}:{self.age}:{self.height}:{self.birthday.date().isoformat()}:{self.woman}:{self.hair.name}:{self.eyes.name}"
+#     def txt_row(self, format: str = "") -> str:
+#         """export data as single row of text"""
+#         return f"{self.name}:{self.age}:{self.height}:{self.birthday.date().isoformat()}:{self.woman}:{self.hair.name}:{self.eyes.name}"
 
-    @classmethod
-    def from_txt(cls, text: str, **kwargs) -> Self:
-        """Provide parse object from a line of text"""
-        debug(f"line: {text}")
-        n, a, h, bd, w, ha, e = text.split(":")
-        debug(
-            "name=%s, age=%s height=%s, birthday=%s, woman=%s, hair=%s, eyes=%s",
-            n,
-            a,
-            h,
-            bd,
-            w,
-            ha,
-            e,
-        )
-        return cls(
-            name=n,
-            age=int(a),
-            height=float(h),
-            birthday=datetime.fromisoformat(bd),
-            woman=(w == "True"),
-            hair=Hair[ha],
-            eyes=Eyes[e],
-            **kwargs,
-        )
+#     @classmethod
+#     def from_txt(cls, text: str, **kwargs) -> Self:
+#         """Provide parse object from a line of text"""
+#         debug(f"line: {text}")
+#         n, a, h, bd, w, ha, e = text.split(":")
+#         debug(
+#             "name=%s, age=%s height=%s, birthday=%s, woman=%s, hair=%s, eyes=%s",
+#             n,
+#             a,
+#             h,
+#             bd,
+#             w,
+#             ha,
+#             e,
+#         )
+#         return cls(
+#             name=n,
+#             age=int(a),
+#             height=float(h),
+#             birthday=datetime.fromisoformat(bd),
+#             woman=(w == "True"),
+#             hair=Hair[ha],
+#             eyes=Eyes[e],
+#             **kwargs,
+#         )
 
-    def __hash__(self) -> int:
-        """Make object hashable, but using index fields only"""
-        return hash((self.name, self.birthday.date()))
+#     def __hash__(self) -> int:
+#         """Make object hashable, but using index fields only"""
+#         return hash((self.name, self.birthday.date()))
 
 
 def rm_parenthesis(name: str) -> str:
@@ -291,18 +291,18 @@ def add_parenthesis(name: str) -> str:
     return f"{name}()"
 
 
-class CSVPerson(TXTPerson):
-    favorite_func: str
+# class CSVPerson(TXTPerson):
+#     favorite_func: str
 
-    _csv_custom_readers = {"favorite_func": add_parenthesis}
-    _csv_custom_writers = {"favorite_func": rm_parenthesis}
+#     _csv_custom_readers = {"favorite_func": add_parenthesis}
+#     _csv_custom_writers = {"favorite_func": rm_parenthesis}
 
 
-class CSVChild(CSVPerson):
-    favorite_func: str
+# class CSVChild(CSVPerson):
+#     favorite_func: str
 
-    _csv_custom_readers = {"toy": str.lower}
-    _csv_custom_writers = {"toy": str.upper}
+#     _csv_custom_readers = {"toy": str.lower}
+#     _csv_custom_writers = {"toy": str.upper}
 
 
 @pytest.fixture
@@ -324,70 +324,70 @@ def json_adults() -> List[JSONAdult]:
     return res
 
 
-@pytest.fixture
-def csv_data() -> List[CSVPerson]:
-    res: List[CSVPerson] = list()
-    res.append(
-        CSVPerson(
-            name="Marie",
-            age=0,
-            height=1.85,
-            woman=True,
-            eyes=Eyes.brown,
-            hair=Hair.red,
-            favorite_func="VLOOKUP()",
-        )
-    )
-    res.append(
-        CSVPerson(
-            name="Jack Who",
-            age=45,
-            height=1.43,
-            birthday=datetime.fromisoformat("1977-07-23"),
-            eyes=Eyes.grey,
-            favorite_func="INDEX()",
-        )
-    )
-    res.append(
-        CSVPerson(
-            name="James 3.5",
-            age=18,
-            height=1.76,
-            birthday=datetime.fromisoformat("2005-02-14"),
-            hair=Hair.blonde,
-            favorite_func="SUMPRODUCT()",
-        )
-    )
-    return res
+# @pytest.fixture
+# def csv_data() -> List[CSVPerson]:
+#     res: List[CSVPerson] = list()
+#     res.append(
+#         CSVPerson(
+#             name="Marie",
+#             age=0,
+#             height=1.85,
+#             woman=True,
+#             eyes=Eyes.brown,
+#             hair=Hair.red,
+#             favorite_func="VLOOKUP()",
+#         )
+#     )
+#     res.append(
+#         CSVPerson(
+#             name="Jack Who",
+#             age=45,
+#             height=1.43,
+#             birthday=datetime.fromisoformat("1977-07-23"),
+#             eyes=Eyes.grey,
+#             favorite_func="INDEX()",
+#         )
+#     )
+#     res.append(
+#         CSVPerson(
+#             name="James 3.5",
+#             age=18,
+#             height=1.76,
+#             birthday=datetime.fromisoformat("2005-02-14"),
+#             hair=Hair.blonde,
+#             favorite_func="SUMPRODUCT()",
+#         )
+#     )
+#     return res
 
 
-@pytest.fixture
-def txt_data() -> List[TXTPerson]:
-    res: List[TXTPerson] = list()
-    res.append(
-        TXTPerson(
-            name="Marie", age=0, height=1.85, woman=True, eyes=Eyes.brown, hair=Hair.red
-        )
-    )
-    res.append(
-        TXTPerson(
-            name="Jack Who",
-            age=45,
-            height=1.43,
-            birthday=datetime.fromisoformat("1977-07-23"),
-            eyes=Eyes.grey,
-        )
-    )
-    res.append(
-        TXTPerson(
-            name="James 3.5",
-            age=18,
-            height=1.76,
-            birthday=datetime.fromisoformat("2005-02-14"),
-            hair=Hair.blonde,
-        )
-    )
-    return res
+# @pytest.fixture
+# def txt_data() -> List[TXTPerson]:
+#     res: List[TXTPerson] = list()
+#     res.append(
+#         TXTPerson(
+#             name="Marie", age=0, height=1.85, woman=True, eyes=Eyes.brown, hair=Hair.red
+#         )
+#     )
+#     res.append(
+#         TXTPerson(
+#             name="Jack Who",
+#             age=45,
+#             height=1.43,
+#             birthday=datetime.fromisoformat("1977-07-23"),
+#             eyes=Eyes.grey,
+#         )
+#     )
+#     res.append(
+#         TXTPerson(
+#             name="James 3.5",
+#             age=18,
+#             height=1.76,
+#             birthday=datetime.fromisoformat("2005-02-14"),
+#             hair=Hair.blonde,
+#         )
+#     )
+#     return res
 
 
 # @pytest.mark.asyncio

@@ -16,7 +16,7 @@ import sys
 from pydantic_exportables import (
     Idx,
     JSONExportable,
-    Importable,
+    # Importable,
     get_model,
     get_model_res,
     epoch_now,
@@ -68,7 +68,7 @@ class JSONChild(BaseModel):
         return {"name": self.index}
 
 
-class JSONParent(JSONExportable, Importable):
+class JSONParent(JSONExportable):
     name: str
     amount: int = 0
     correct: bool = Field(default=False, alias="c")
@@ -201,9 +201,7 @@ async def _get(url: str, rate: float, N: int) -> list[float]:
     return timings
 
 
-async def _wait_for_server(
-    url: str, interval: float = 0.1
-) -> None:
+async def _wait_for_server(url: str, interval: float = 0.1) -> None:
     """Wait until the test HTTP server is ready to accept requests."""
     async with ClientSession() as session:
         while True:
