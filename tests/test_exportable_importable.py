@@ -85,7 +85,7 @@ async def open_json(
     return None
 
 
-async def save_json(obj: BaseModel, filename: Path | str) -> int:
+async def save_json(obj: JSONExportable, filename: Path | str) -> int:
     """Save object JSON into a file"""
     filename = str2path(filename)
     #
