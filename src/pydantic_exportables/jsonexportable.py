@@ -20,7 +20,7 @@ from typing import (
     Callable,
     Sequence,
 )
-
+from enum import StrEnum
 from collections.abc import ItemsView, ValuesView, KeysView
 from collections.abc import MutableMapping
 
@@ -258,7 +258,7 @@ class JSONExportable(BaseModel):
                 item[parts[-1]] = value
             return tree
 
-        class ContainerEnum(str):
+        class ContainerEnum(StrEnum):
             """Helper class to identify container types in the unflattening process"""
 
             list = "[]"
