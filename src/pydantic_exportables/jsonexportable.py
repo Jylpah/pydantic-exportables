@@ -19,18 +19,11 @@ from typing import (
     Generic,
     Callable,
     Sequence,
-    # AsyncGenerator,
-    # AsyncIterable,
 )
 
-# from asyncio import CancelledError
-# from os import linesep
 from collections.abc import ItemsView, ValuesView, KeysView
-
-# from pathlib import Path
 from collections.abc import MutableMapping
 
-# from aiofiles import open
 from pydantic import (
     BaseModel,
     RootModel,
@@ -39,22 +32,12 @@ from pydantic import (
     Field,
 )
 
-# from eventcounter import EventCounter
-
 # from deprecated import deprecated
 from .pyobjectid import PyObjectId
-# from .utils import str2path
-
 
 TypeExcludeDict = MutableMapping[int | str, Any]
 
-# DESCENDING: Literal[-1] = -1
-# ASCENDING: Literal[1] = 1
 TEXT: Literal["text"] = "text"
-
-# IndexSortOrder = Literal[-1, 1, "text"]
-# BackendIndex = tuple[str, IndexSortOrder]
-
 Idx = Union[int, PyObjectId, str]
 IdxType = TypeVar("IdxType", bound=Idx)
 JSONExportableType = TypeVar("JSONExportableType", bound="JSONExportable")
@@ -98,7 +81,8 @@ class JSONExportable(BaseModel):
     ] = dict()
 
     def _set_skip_validation(self, name: str, value: Any) -> None:
-        """Workaround to be able to set fields without validation."""
+        """Set fields without validation. Required to avoid
+        validation loops when updating nested JSONExportables"""
         attr = getattr(self.__class__, name, None)
         if isinstance(attr, property):
             attr.__set__(self, value)
@@ -119,7 +103,7 @@ class JSONExportable(BaseModel):
         obj_type: Any,
         method: Callable[[Any], Optional[Self]],
     ) -> None:
-        """Register transformations"""
+        """Register a transformation"""
         cls._transformations[obj_type] = method
         return None
 
@@ -179,24 +163,6 @@ class JSONExportable(BaseModel):
             if (out := cls.from_obj(obj, in_type=in_type)) is not None
         ]
 
-    # @classmethod
-    # async def open_json(
-    #     cls, filename: Path | str, exceptions: bool = False
-    # ) -> Self | None:
-    #     """Open replay JSON file and return class instance"""
-    #     try:
-    #         async with open(filename, "r") as f:
-    #             return cls.model_validate_json(await f.read())
-    #     except ValueError as err:
-    #         debug(f"Could not parse {type(cls)} from file: {filename}: {err}")
-    #         if exceptions:
-    #             raise
-    #     except OSError as err:
-    #         debug(f"Error reading file: {filename}: {err}")
-    #         if exceptions:
-    #             raise
-    #     return None
-
     @classmethod
     def parse_str(cls, content: str) -> Self | None:
         """return class instance from a JSON string"""
@@ -207,36 +173,6 @@ class JSONExportable(BaseModel):
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
-
-    # @classmethod
-    # async def import_json(
-    #     cls, filename: Path | str, **kwargs
-    # ) -> AsyncGenerator[Self, None]:
-    #     """Import models from filename, one model per line"""
-    #     try:
-    #         # importable : JSONImportableSelf | None
-    #         async with open(filename, "r") as f:
-    #             async for line in f:
-    #                 try:
-    #                     if (importable := cls.parse_str(line, **kwargs)) is not None:
-    #                         yield importable
-    #                 except Exception as err:
-    #                     error(f"{err}")
-    #     except OSError as err:
-    #         error(f"Error importing file {filename}: {err}")
-
-    # async def save_json(self, filename: Path | str) -> int:
-    #     """Save object JSON into a file"""
-    #     filename = str2path(filename)
-
-    #     try:
-    #         if not filename.name.endswith(".json"):
-    #             filename = filename.with_suffix(".json")
-    #         async with open(filename, mode="w", encoding="utf-8") as rf:
-    #             return await rf.write(self.json_src())
-    #     except Exception as err:
-    #         error(f"Error writing file {filename}: {err}")
-    #     return -1
 
     def _export_helper(
         self, params: dict[str, Any], fields: list[str] | None = None, **kwargs
@@ -280,9 +216,23 @@ class JSONExportable(BaseModel):
                 for key, value in obj.items():
                     new_key = f"{parent_key}{sep}{key}" if parent_key else str(key)
                     flattened.update(_flatten(value, new_key))
-            elif isinstance(obj, (list, tuple)):
+            elif isinstance(obj, list):
                 for index, value in enumerate(obj):
-                    new_key = f"{parent_key}{sep}{index}" if parent_key else str(index)
+                    new_key = (
+                        f"{parent_key}[]{sep}{index}" if parent_key else str(index)
+                    )
+                    flattened.update(_flatten(value, new_key))
+            elif isinstance(obj, tuple):
+                for index, value in enumerate(obj):
+                    new_key = (
+                        f"{parent_key}(){sep}{index}" if parent_key else str(index)
+                    )
+                    flattened.update(_flatten(value, new_key))
+            elif isinstance(obj, set):
+                for index, value in enumerate(obj):
+                    new_key = (
+                        f"{parent_key}{{}}{sep}{index}" if parent_key else str(index)
+                    )
                     flattened.update(_flatten(value, new_key))
             else:
                 flattened[parent_key] = obj
@@ -290,28 +240,84 @@ class JSONExportable(BaseModel):
 
         return _flatten(self.model_dump())
 
-    # # TODO: Create a Protocol and move implementation to blitz-stats
-    # @property
-    # @deprecated(version="1.1.2", reason="Will removed in 1.4")
-    # def indexes(self) -> dict[str, Idx]:
-    #     """return backend indexes"""
-    #     raise NotImplementedError
+    @classmethod
+    def from_flattened(cls, flat_dict: dict[str, Any], sep: str = ".") -> Self:
+        """
+        return unflattened representation of the object
+        """
 
-    # # TODO: Create a Protocol and move implementation to blitz-stats
-    # @classmethod
-    # @deprecated(version="1.1.2", reason="Will removed in 1.4")
-    # def backend_indexes(cls) -> list[list[tuple[str, IndexSortOrder]]]:
-    #     """return backend search indexes"""
-    #     raise NotImplementedError
+        def _parse_tree(flat_dict: dict[str, Any]) -> dict[str, Any]:
+            tree: dict[str, Any] = dict()
+            for key, value in flat_dict.items():
+                parts: list[str] = key.split(sep)
+                item = tree  # dicts are assigned by reference, so this modifies the tree in place
+                for i in range(len(parts) - 1):
+                    if parts[i] not in item:
+                        item[parts[i]] = {}
+                    item = item[parts[i]]
+                item[parts[-1]] = value
+            return tree
 
-    # # TODO: Create a Protocol and move implementation to blitz-stats
-    # @classmethod
-    # @deprecated(version="1.1.2", reason="Will removed in 1.4")
-    # def example_instance(cls) -> Self:
-    #     """return a example instance of the class"""
-    #     if len(cls._example) > 0:
-    #         return cls.model_validate_json(cls._example)
-    #     raise NotImplementedError
+        class ContainerEnum(str):
+            """Helper class to identify container types in the unflattening process"""
+
+            list = "[]"
+            tuple = "()"
+            set = "{}"
+
+        def _unflatten(
+            tree: dict[str, Any] | Any,
+            containerType: ContainerEnum | None = None,
+        ) -> Any:
+            """
+            Recursively unflatten a tree. If a dict has only digit keys, convert it to a list.
+            If a value ("tree") is not a dict, return it as is. Assumes that the tree is nerver a list.
+            The function cannot handle sets.
+            """
+            if isinstance(tree, dict):
+                if containerType is not None:
+                    if containerType == ContainerEnum.list:
+                        return [_unflatten(item) for item in tree.values()]
+                    elif containerType == ContainerEnum.tuple:
+                        return tuple(_unflatten(item) for item in tree.values())
+                    elif containerType == ContainerEnum.set:
+                        return set(_unflatten(item) for item in tree.values())
+                for key, value in tree.items():
+                    if key.endswith("[]"):
+                        tree[key[:-2]] = _unflatten(
+                            value, containerType=ContainerEnum.list
+                        )
+                        del tree[key]
+                    elif key.endswith("()"):
+                        tree[key[:-2]] = _unflatten(
+                            value, containerType=ContainerEnum.tuple
+                        )
+                        del tree[key]
+                    elif key.endswith("{}"):
+                        tree[key[:-2]] = _unflatten(
+                            value, containerType=ContainerEnum.set
+                        )
+                        del tree[key]
+                    else:
+                        tree[key] = _unflatten(value)
+            return tree
+
+        tree: dict[str, Any] = _parse_tree(flat_dict)
+        keys: list[str] = list(tree.keys())
+        for key in keys:
+            value = tree[key]
+            if key.endswith("[]"):
+                tree[key[:-2]] = _unflatten(value, containerType=ContainerEnum.list)
+                del tree[key]
+            elif key.endswith("()"):
+                tree[key[:-2]] = _unflatten(value, containerType=ContainerEnum.tuple)
+                del tree[key]
+            elif key.endswith("{}"):
+                tree[key[:-2]] = _unflatten(value, containerType=ContainerEnum.set)
+                del tree[key]
+            tree[key] = _unflatten(value)
+
+        return cls.model_validate(tree)
 
     def __hash__(self) -> int:
         """
@@ -531,37 +537,6 @@ class JSONExportableRootDict(
             error("could not parse object as %s: %s", cls.__name__, str(err))
         return None
 
-    # async def save_json(self, filename: Path | str) -> int:
-    #     """Save object as JSON into a file"""
-    #     filename = str2path(filename)
-
-    #     try:
-    #         if not filename.name.endswith(".json"):
-    #             filename = filename.with_suffix(".json")
-    #         async with open(filename, mode="w", encoding="utf-8") as rf:
-    #             return await rf.write(self.json_src())
-    #     except Exception as err:
-    #         error(f"Error writing file {filename}: {err}")
-    #     return -1
-
-    # @classmethod
-    # async def open_json(
-    #     cls, filename: Path | str, exceptions: bool = False
-    # ) -> Self | None:
-    #     """Open replay JSON file and return class instance"""
-    #     try:
-    #         async with open(filename, "r") as f:
-    #             return cls.model_validate_json(await f.read())
-    #     except ValueError as err:
-    #         debug(f"Could not parse {type(cls)} from file: {filename}: {err}")
-    #         if exceptions:
-    #             raise
-    #     except OSError as err:
-    #         debug(f"Error reading file: {filename}: {err}")
-    #         if exceptions:
-    #             raise
-    #     return None
-
     @classmethod
     def parse_str(cls, content: str) -> Self | None:
         """return class instance from a JSON string"""
@@ -570,52 +545,3 @@ class JSONExportableRootDict(
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
-
-
-# async def export_json(
-#     iterable: AsyncIterable[JSONExportable],
-#     filename: Path | str,
-#     force: bool = False,
-#     append: bool = False,
-# ) -> EventCounter:
-#     """Export data to a JSON file"""
-#     # assert type(filename) is str and len(filename) > 0, "filename has to be str"
-#     stats: EventCounter = EventCounter("export JSON")
-#     try:
-#         exportable: JSONExportable
-#         if isinstance(filename, str) and filename == "-":  # STDOUT
-#             async for exportable in iterable:
-#                 try:
-#                     print(exportable.json_src(indent=4))
-#                     stats.log("rows")
-#                 except CancelledError:
-#                     raise
-#                 except Exception as err:
-#                     error(f"error exporting JSON type={type(exportable)}: {err}")
-#                     stats.log("errors")
-#         else:  # FILE
-#             filename = str2path(filename, ".json")
-#             if filename.is_file() and (not (force or append)):
-#                 raise FileExistsError(f"Cannot export to {filename}")
-#             mode: Literal["w", "a"] = "a" if append else "w"
-
-#             debug("opening %s for writing in mode=%s", str(filename), mode)
-#             async with open(filename, mode=mode) as txtfile:
-#                 async for exportable in iterable:
-#                     try:
-#                         debug("writing JSON: %s", exportable.json_src())
-#                         await txtfile.write(exportable.json_src() + linesep)
-#                         stats.log("rows")
-#                     except CancelledError:
-#                         raise
-#                     except Exception as err:
-#                         error(f"{err}")
-#                         stats.log("errors")
-
-#     except CancelledError:
-#         debug("Cancelled")
-#         raise
-#     except Exception as err:
-#         error(f"error exporting to JSON: {err}")
-#         raise
-#     return stats

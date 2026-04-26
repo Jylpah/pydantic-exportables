@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field, ConfigDict
 from pathlib import Path
 from datetime import date, datetime
 from enum import StrEnum, IntEnum
-from time import time
 from bson import ObjectId
 import json
 import logging
@@ -14,28 +13,12 @@ import aiofiles
 from pydantic_exportables import (
     JSONExportable,
     JSONExportableRootDict,
-    #  export,
-    #  export_json,
     Idx,
-    # CSVExportable,
-    # TXTExportable,
-    # TXTImportable,
-    # Importable,
     AliasMapper,
     PyObjectId,
-    #    awrap,
-    #    epoch_now,
+    epoch_now,
+    str2path,
 )
-
-########################################################
-#
-# Test Plan
-#
-########################################################
-
-# 1) Create instances, export as JSON, import back and compare
-# 2) Create instances, export as CSV, import back and compare
-# 3) Create instances, export as TXT, import back and compare
 
 logger = logging.getLogger(__name__)
 error = logger.error
@@ -49,20 +32,6 @@ debug = logger.debug
 # Helper functions
 #
 ###########################################################
-
-
-def epoch_now() -> int:
-    return int(time())
-
-
-def str2path(filename: str | Path, suffix: str | None = None) -> Path:
-    """convert filename (str) to pathlib.Path"""
-    if isinstance(filename, str):
-        filename = Path(filename)
-    if suffix is not None and not filename.name.lower().endswith(suffix):
-        filename = filename.with_suffix(suffix)
-    return filename
-
 
 B = TypeVar("B", bound=BaseModel)
 
@@ -148,11 +117,6 @@ class JSONChild(JSONExportable):
         """return backend index"""
         return self.name
 
-    # @property
-    # def indexes(self) -> dict[str, Idx]:
-    #     """return backend indexes"""
-    #     return {"name": self.index}
-
 
 class JSONParent(JSONExportable):
     name: str = Field(alias="n")
@@ -167,11 +131,6 @@ class JSONParent(JSONExportable):
     def index(self) -> Idx:
         """return backend index"""
         return self.name
-
-    # @property
-    # def indexes(self) -> dict[str, Idx]:
-    #     """return backend indexes"""
-    #     return {"name": self.index}
 
 
 class JSONAdult(JSONExportable):
@@ -909,6 +868,113 @@ def test_14_jsonexportable_hash():
     assert len(parent_set) == 3, (
         "__hash__() failed: hashable objects should still be distinguished by identity when __eq__ is not overridden"
     )
+
+
+def test_15_flatten_jsonexportable() -> None:
+    child = JSONChild(name="Child", born=1234567890)
+    parent = JSONParent(
+        name="Parent",
+        years=40,
+        married=True,
+        array=["a", "b"],
+        child=child,
+    )
+
+    flat_dict = parent.flatten()
+    expected_keys = {
+        "name",
+        "years",
+        "married",
+        "array[].0",
+        "array[].1",
+        "child.name",
+        "child.born",
+    }
+    assert set(flat_dict.keys()) == expected_keys, (
+        f"flattened_dict() returned incorrect keys: {set(flat_dict.keys())} != {expected_keys}"
+    )
+    assert flat_dict["name"] == parent.name, (
+        "flattened_dict() returned incorrect value for 'name'"
+    )
+    assert flat_dict["years"] == parent.years, (
+        "flattened_dict() returned incorrect value for 'years'"
+    )
+    assert flat_dict["married"] == parent.married, (
+        "flattened_dict() returned incorrect value for 'married'"
+    )
+    assert flat_dict["array[].0"] == parent.array[0], (
+        "flattened_dict() returned incorrect value for 'array'"
+    )
+    assert flat_dict["array[].1"] == parent.array[1], (
+        "flattened_dict() returned incorrect value for 'array'"
+    )
+    assert flat_dict["child.name"] == parent.child.name, (
+        "flattened_dict() returned incorrect value for 'child.name'"
+    )
+    assert flat_dict["child.born"] == parent.child.born, (
+        "flattened_dict() returned incorrect value for 'child.born'"
+    )
+
+
+def test_16_jsonexportable_from_flattened():
+    child = JSONChild(name="Child", born=1234567890)
+    parent = JSONParent(
+        name="Parent",
+        years=40,
+        married=True,
+        array=["a", "b"],
+        child=child,
+    )
+
+    assert (parent_new := JSONParent.from_flattened(parent.flatten())) is not None, (
+        "from_flattened() could not recreate instance from flatten()"
+    )
+    assert parent_new == parent, "from_flattened() did not reverse flatten()"
+
+
+def test_17_jsonexportable_from_flattened_custom_separator():
+    child = JSONChild(name="Child", born=1234567890)
+    parent = JSONParent(
+        name="Parent",
+        years=40,
+        married=True,
+        array=["a", "b"],
+        child=child,
+    )
+
+    assert (
+        parent_new := JSONParent.from_flattened(parent.flatten(sep="__"), sep="__")
+    ) is not None, "from_flattened() could not recreate instance with custom separator"
+    assert parent_new == parent, (
+        "from_flattened() did not reverse flatten() with custom separator"
+    )
+
+
+def test_18_jsonexportable_from_flattened_numeric_dict_keys():
+    class JSONNumericDict(JSONExportable):
+        name: str
+        scores: dict[int, str]
+
+        @property
+        def index(self) -> Idx:
+            return self.name
+
+    obj = JSONNumericDict(name="numbers", scores={0: "zero", 1: "one"})
+
+    assert (obj_new := JSONNumericDict.from_flattened(obj.flatten())) is not None, (
+        "from_flattened() could not recreate instance with numeric dict keys"
+    )
+    assert obj_new == obj, "from_flattened() converted numeric dict keys incorrectly"
+
+
+def test_19_jsonexportable_from_flattened(json_parents: List[JSONParent]) -> None:
+    for parent in json_parents:
+        flat_dict = parent.flatten()
+        assert isinstance(flat_dict, dict), "flatten() should return a dictionary"
+        assert len(flat_dict) > 0, "flatten() returned an empty dictionary"
+        assert parent == JSONParent.from_flattened(flat_dict), (
+            "from_flattened() did not reverse flatten() correctly"
+        )
 
 
 # @pytest.mark.asyncio
