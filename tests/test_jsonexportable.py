@@ -908,7 +908,7 @@ def test_15_flatten_jsonexportable() -> None:
     assert flat_dict["array[].1"] == parent.array[1], (
         "flattened_dict() returned incorrect value for 'array'"
     )
-    assert flat_dict["child.name"] == parent.child.name, (
+    assert parent.child is not None and flat_dict["child.name"] == parent.child.name, (
         "flattened_dict() returned incorrect value for 'child.name'"
     )
     assert flat_dict["child.born"] == parent.child.born, (
@@ -950,7 +950,7 @@ def test_17_jsonexportable_from_flattened_custom_separator():
     )
 
 
-def test_18_jsonexportable_from_flattened_numeric_dict_keys():
+def test_18_jsonexportable_from_flattened_numeric_dict_keys() -> None:
     class JSONNumericDict(JSONExportable):
         name: str
         scores: dict[int, str]
