@@ -205,7 +205,7 @@ class JSONExportable(BaseModel):
         """return backend index"""
         raise NotImplementedError
 
-    def flatten(self, sep: str = ".") -> dict[str, Any]:
+    def flatten(self, sep: str = ".", by_alias: bool = False) -> dict[str, Any]:
         """
         return flattened representation of the object
         """
@@ -238,10 +238,15 @@ class JSONExportable(BaseModel):
                 flattened[parent_key] = obj
             return flattened
 
-        return _flatten(self.model_dump())
+        return _flatten(self.model_dump(by_alias=by_alias))
 
     @classmethod
-    def from_flattened(cls, flat_dict: dict[str, Any], sep: str = ".") -> Self:
+    def from_flattened(
+        cls,
+        flat_dict: dict[str, Any],
+        by_alias: bool = False,
+        sep: str = ".",
+    ) -> Self:
         """
         return unflattened representation of the object
         """
@@ -317,7 +322,7 @@ class JSONExportable(BaseModel):
                 del tree[key]
             tree[key] = _unflatten(value)
 
-        return cls.model_validate(tree)
+        return cls.model_validate(tree, by_alias=by_alias)
 
     def __hash__(self) -> int:
         """
