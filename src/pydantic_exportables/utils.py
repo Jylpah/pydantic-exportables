@@ -1,8 +1,17 @@
-from typing import TypeVar
-from pydantic import BaseModel
+from typing import TypeVar, Optional, Iterable, AsyncGenerator, Type
 from pathlib import Path
 from time import time
+from csv import Dialect, excel
+from asyncio import sleep, CancelledError
+
+from aiohttp import ClientSession, ClientError
+from pydantic import BaseModel
+from aiocsv.readers import AsyncDictReader
+from result import Result, Ok, Err, is_Ok
+
 from multilevellogger import getMultiLevelLogger, MultiLevelLogger
+
+from pydantic_exportables import CSVExportable
 
 # Setup logging
 logger: MultiLevelLogger = getMultiLevelLogger(__name__)
@@ -16,6 +25,7 @@ MAX_RETRIES: int = 3
 SLEEP: float = 1
 
 M = TypeVar("M", bound=BaseModel)
+C = TypeVar("C", bound=CSVExportable)
 T = TypeVar("T")
 
 ##############################################
@@ -25,14 +35,14 @@ T = TypeVar("T")
 ##############################################
 
 
-# async def awrap(iterable: Iterable[T]) -> AsyncGenerator[T, None]:
-#     """awrap() is a async wrapper for Iterables
+async def awrap(iterable: Iterable[T]) -> AsyncGenerator[T, None]:
+    """awrap() is a async wrapper for Iterables
 
-#     It converts an Iterable[T] to AsyncGenerator[T].
-#     AsyncGenerator[T] is also AsyncIterable[T] allowing it to be used in async for
-#     """
-#     for item in iter(iterable):
-#         yield item
+    It converts an Iterable[T] to AsyncGenerator[T].
+    AsyncGenerator[T] is also AsyncIterable[T] allowing it to be used in async for
+    """
+    for item in iter(iterable):
+        yield item
 
 
 def epoch_now() -> int:
@@ -48,118 +58,150 @@ def str2path(filename: str | Path, suffix: str | None = None) -> Path:
     return filename
 
 
-# async def get_model(
-#     session: ClientSession, url: str, resp_model: type[M], retries: int = MAX_RETRIES
-# ) -> Optional[M]:
-#     """Get JSON from URL and return object. Validate JSON against resp_model, if given."""
+async def get_model(
+    session: ClientSession, url: str, resp_model: type[M], retries: int = MAX_RETRIES
+) -> Optional[M]:
+    """Get JSON from URL and return object. Validate JSON against resp_model, if given."""
 
-#     content: str | None = None
-#     try:
-#         if (
-#             content := await get_url(session=session, url=url, retries=retries)
-#         ) is not None:
-#             return resp_model.model_validate_json(content)
-#         debug("get_url() returned None")
-#     except ValueError as err:
-#         debug(
-#             f"{resp_model.__name__}: {url}: response={content}: Validation error={err}"
-#         )
-#     except Exception as err:
-#         debug(f"Unexpected error: {err}")
-#     return None
-
-
-# async def get_url(
-#     session: ClientSession, url: str, retries: int = MAX_RETRIES
-# ) -> str | None:
-#     """Retrieve (GET) an URL and return content as text"""
-#     assert session is not None, "Session must be initialized first"
-#     assert url is not None, "url cannot be None"
-
-#     # if not is_url(url):
-#     #     raise ValueError(f"URL is malformed: {url}")
-
-#     for retry in range(1, retries + 1):
-#         debug(f"GET {url} try {retry} / {retries}")
-#         try:
-#             async with session.get(url) as resp:
-#                 debug(f"GET {url} HTTP response status {resp.status}/{resp.reason}")
-#                 if resp.ok:
-#                     return await resp.text()
-#         except ClientError as err:
-#             debug(f"Could not retrieve URL: {url} : {err}")
-#         except CancelledError as err:
-#             debug(f"Cancelled while still working: {err}")
-#             raise
-#         # except Exception as err:
-#         #     debug(f"Unexpected error {err}")
-#         await sleep(SLEEP)
-#     verbose(f"Could not retrieve URL: {url}")
-#     return None
+    content: str | None = None
+    try:
+        if (
+            content := await get_url(session=session, url=url, retries=retries)
+        ) is not None:
+            return resp_model.model_validate_json(content)
+        debug("get_url() returned None")
+    except ValueError as err:
+        debug(
+            f"{resp_model.__name__}: {url}: response={content}: Validation error={err}"
+        )
+    except Exception as err:
+        debug(f"Unexpected error: {err}")
+    return None
 
 
-# async def get_url_res(
-#     session: ClientSession,
-#     url: str,
-#     retries: int = MAX_RETRIES,
-#     retry_wait: float = SLEEP,
-# ) -> Result[str, tuple[int, str]]:
-#     """
-#     Retrieve (GET) an URL and return content as Result[str, str]
+async def get_url(
+    session: ClientSession, url: str, retries: int = MAX_RETRIES
+) -> str | None:
+    """Retrieve (GET) an URL and return content as text"""
+    assert session is not None, "Session must be initialized first"
+    assert url is not None, "url cannot be None"
 
-#     See: https://pypi.org/project/result/
-#     """
+    # if not is_url(url):
+    #     raise ValueError(f"URL is malformed: {url}")
 
-#     assert session is not None, "Session must be initialized first"
-#     assert url is not None, "url cannot be None"
-
-#     status: int = -1
-#     reason: str | None = None
-#     for retry in range(1, retries + 1):
-#         debug(f"GET {url} try {retry} / {retries}")
-#         try:
-#             async with session.get(url) as resp:
-#                 debug(f"GET {url} HTTP response status {resp.status}/{resp.reason}")
-#                 if resp.ok:
-#                     return Ok(await resp.text())
-#                 else:
-#                     status = resp.status
-#                     reason = resp.reason
-#         except ClientError as err:
-#             debug(f"Could not retrieve URL: {url} : {err}")
-#         except CancelledError as err:
-#             debug(f"Cancelled while still working: {err}")
-#             raise
-#         await sleep(retry_wait)
-#     debug(f"Could not retrieve URL: {url}")
-#     if reason is None:
-#         reason = "Unknown"
-#     return Err((status, reason))
+    for retry in range(1, retries + 1):
+        debug(f"GET {url} try {retry} / {retries}")
+        try:
+            async with session.get(url) as resp:
+                debug(f"GET {url} HTTP response status {resp.status}/{resp.reason}")
+                if resp.ok:
+                    return await resp.text()
+        except ClientError as err:
+            debug(f"Could not retrieve URL: {url} : {err}")
+        except CancelledError as err:
+            debug(f"Cancelled while still working: {err}")
+            raise
+        # except Exception as err:
+        #     debug(f"Unexpected error {err}")
+        await sleep(SLEEP)
+    verbose(f"Could not retrieve URL: {url}")
+    return None
 
 
-# async def get_model_res(
-#     session: ClientSession, url: str, resp_model: type[M], retries: int = MAX_RETRIES
-# ) -> Result[M | None, tuple[int, str]]:
-#     """
-#     Get JSON from URL and return a Result object. Validate JSON against resp_model, if given.
+async def get_url_res(
+    session: ClientSession,
+    url: str,
+    retries: int = MAX_RETRIES,
+    retry_wait: float = SLEEP,
+) -> Result[str, tuple[int, str]]:
+    """
+    Retrieve (GET) an URL and return content as Result[str, str]
 
-#     See: https://pypi.org/project/result/
-#     """
+    See: https://pypi.org/project/result/
+    """
 
-#     content: Result[str, tuple[int, str]] = Err((-1, "Unknown"))
-#     try:
-#         if isinstance(
-#             content := await get_url_res(session=session, url=url, retries=retries), Ok
-#         ):
-#             try:
-#                 return Ok(resp_model.model_validate_json(content.ok_value))
-#             except ValueError as err:
-#                 debug(
-#                     f"{resp_model.__name__}: {url}: response={content.ok_value}: Validation error={err}"
-#                 )
-#             return Err((2, "Validation error"))
-#         else:
-#             return Err(content.err_value)
-#     except Exception as err:
-#         debug(f"Unexpected error: {err}")
-#         return Err((1, f"Unexpected error: {err} "))
+    assert session is not None, "Session must be initialized first"
+    assert url is not None, "url cannot be None"
+
+    status: int = -1
+    reason: str | None = None
+    for retry in range(1, retries + 1):
+        debug(f"GET {url} try {retry} / {retries}")
+        try:
+            async with session.get(url) as resp:
+                debug(f"GET {url} HTTP response status {resp.status}/{resp.reason}")
+                if resp.ok:
+                    return Ok(await resp.text())
+                else:
+                    status = resp.status
+                    reason = resp.reason
+        except ClientError as err:
+            debug(f"Could not retrieve URL: {url} : {err}")
+        except CancelledError as err:
+            debug(f"Cancelled while still working: {err}")
+            raise
+        await sleep(retry_wait)
+    debug(f"Could not retrieve URL: {url}")
+    if reason is None:
+        reason = "Unknown"
+    return Err((status, reason))
+
+
+async def get_model_res(
+    session: ClientSession, url: str, resp_model: type[M], retries: int = MAX_RETRIES
+) -> Result[M | None, tuple[int, str]]:
+    """
+    Get JSON from URL and return a Result object. Validate JSON against resp_model, if given.
+
+    See: https://pypi.org/project/result/
+    """
+
+    content: Result[str, tuple[int, str]] = Err((-1, "Unknown"))
+    try:
+        if isinstance(
+            content := await get_url_res(session=session, url=url, retries=retries), Ok
+        ):
+            try:
+                return Ok(resp_model.model_validate_json(content.ok_value))
+            except ValueError as err:
+                debug(
+                    f"{resp_model.__name__}: {url}: response={content.ok_value}: Validation error={err}"
+                )
+            return Err((2, "Validation error"))
+        else:
+            return Err(content.err_value)
+    except Exception as err:
+        debug(f"Unexpected error: {err}")
+        return Err((1, f"Unexpected error: {err} "))
+
+
+##################################################
+#
+## CSV functions
+#
+###################################################
+
+
+@classmethod
+async def import_csv(
+    csv_model: Type[CSVExportable], filename: Path | str, dialect: Type[Dialect] = excel
+) -> AsyncGenerator[CSVExportable, int]:
+    """
+    Import from filename, one model per line
+    """
+    try:
+        lines: int = 0
+        debug("importing from CSV file: %s", str(filename))
+        async with open(filename, mode="r", newline="") as f:
+            async for row in AsyncDictReader(f, dialect=dialect):
+                # debug ("row: %s", row)
+                if is_Ok(importable := csv_model.from_csv(row)):
+                    # debug(f'{importable}')
+                    yield importable.ok_value
+                    lines += 1
+                else:
+                    error(f"Could read line: {importable.err_value}")
+
+    except Exception as err:
+        error(f"Error importing file {filename}: {err}")
+    return lines
