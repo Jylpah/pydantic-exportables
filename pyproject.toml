@@ -93,6 +93,9 @@ exclude_also = [
     "@(abc\\.)?abstractmethod",
     ]
 
+[tool.uv.sources]
+result = { git = "https://github.com/montasaurus/result" }
+
 [dependency-groups]
 dev = [
     "ipython>=9.10.1",
