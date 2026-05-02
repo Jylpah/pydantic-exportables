@@ -5,7 +5,10 @@
 ########################################################
 
 import logging
+from pathlib import Path
 from typing import (
+    AsyncGenerator,
+    AsyncIterable,
     Optional,
     Type,
     Any,
@@ -23,7 +26,7 @@ from typing import (
 from enum import StrEnum
 from collections.abc import ItemsView, ValuesView, KeysView
 from collections.abc import MutableMapping
-
+from os import linesep
 from pydantic import (
     BaseModel,
     RootModel,
@@ -31,9 +34,11 @@ from pydantic import (
     ConfigDict,
     Field,
 )
+import aiofiles
 
 # from deprecated import deprecated
 from .pyobjectid import PyObjectId
+from .utils import str2path
 
 TypeExcludeDict = MutableMapping[int | str, Any]
 
@@ -127,7 +132,7 @@ class JSONExportable(BaseModel):
 
     @classmethod
     def from_obj(
-        cls, obj: Any, in_type: type[BaseModel] | None = None
+        cls, obj: Any, in_type: type[BaseModel] | None = None, exceptions: bool = False
     ) -> Optional[Self]:
         """Parse instance from raw object.
         Returns None if reading from object failed.
@@ -137,17 +142,26 @@ class JSONExportable(BaseModel):
             try:
                 return cls.model_validate(obj)
             except ValidationError as err:
-                error("could not parse object as %s", cls.__name__)
-                debug("%s", str(err))
+                if exceptions:
+                    raise
+                error(
+                    "could not parse object (%s) as %s: %s",
+                    type(obj),
+                    cls.__name__,
+                    err,
+                )
         else:
             try:
                 if (obj_in := in_type.model_validate(obj)) is not None:
                     return cls.transform(obj_in)
             except ValidationError as err:
                 error(
-                    "could not parse object (%s) as %s", in_type.__name__, cls.__name__
+                    "could not parse object (%s) as %s: %s",
+                    in_type.__name__,
+                    cls.__name__,
+                    err,
                 )
-                debug("%s", str(err))
+                debug("%s", err)
         return None
 
     @classmethod
@@ -160,18 +174,18 @@ class JSONExportable(BaseModel):
         return [
             out
             for obj in objs
-            if (out := cls.from_obj(obj, in_type=in_type)) is not None
+            if (out := cls.from_obj(obj, in_type=in_type, exceptions=False)) is not None
         ]
 
     @classmethod
-    def parse_str(cls, content: str) -> Self | None:
+    def parse_str(cls, content: str, exceptions: bool = False) -> Self | None:
         """return class instance from a JSON string"""
         try:
             return cls.model_validate_json(content)
-            ## WORKAROUND for https://github.com/pydantic/pydantic/issues/8189#issuecomment-1823465499
-            # return cls.model_validate(json.loads(content), strict=True)
-        except ValueError as err:
-            debug(f"Could not parse {type(cls)} from JSON: {err}")
+        except ValidationError as err:
+            if exceptions:
+                raise
+            debug("Could not parse %s from JSON: %s", str(type(cls)), err)
         return None
 
     def _export_helper(
@@ -246,6 +260,7 @@ class JSONExportable(BaseModel):
         flat_dict: dict[str, Any],
         by_alias: bool = False,
         sep: str = ".",
+        from_str: bool = False,
     ) -> Self:
         """
         return unflattened representation of the object
@@ -321,8 +336,12 @@ class JSONExportable(BaseModel):
                 tree[key[:-2]] = _unflatten(value, containerType=ContainerEnum.set)
                 del tree[key]
             tree[key] = _unflatten(value)
-
-        return cls.model_validate(tree, by_alias=by_alias)
+        if from_str:
+            return cls.model_validate_strings(
+                tree, by_alias=by_alias, by_name=not by_alias
+            )
+        else:
+            return cls.model_validate(tree, by_alias=by_alias, by_name=not by_alias)
 
     def __hash__(self) -> int:
         """
@@ -404,6 +423,111 @@ class JSONExportable(BaseModel):
             updated = True
 
         return updated
+
+    @classmethod
+    async def aopen_json(
+        cls, filename: Path | str, exceptions: bool = False
+    ) -> Self | None:
+        """Load a model from a JSON file using aiofiles.open().
+
+        Returns None on read/parse/validation errors unless exceptions=True.
+        """
+        try:
+            async with aiofiles.open(filename, "r") as f:
+                return cls.model_validate_json(await f.read())
+        except ValidationError as err:
+            if exceptions:
+                raise
+            debug("Could not parse %s from file: %s: %s", type(cls), filename, err)
+        except OSError as err:
+            debug("Error reading file: %s: %s", filename, err)
+            if exceptions:
+                raise
+        return None
+
+    @classmethod
+    def open_json(cls, filename: Path | str, exceptions: bool = False) -> Self | None:
+        """Load a model from a JSON file python open().
+
+        Returns None on read/parse/validation errors unless exceptions=True.
+        """
+        try:
+            with open(filename, "r") as f:
+                return cls.model_validate_json(f.read())
+        except ValidationError as err:
+            if exceptions:
+                raise
+            debug("Could not parse %s from file: %s: %s", type(cls), filename, err)
+        except OSError as err:
+            debug("Error reading file: %s: %s", filename, err)
+            if exceptions:
+                raise
+        return None
+
+    @classmethod
+    async def aimport_json(
+        cls, filename: Path | str, exceptions: bool = False, **kwargs
+    ) -> AsyncGenerator[Self, None]:
+        """Import models from filename, one model per line"""
+        try:
+            # importable : JSONImportableSelf | None
+            async with aiofiles.open(filename, "r") as f:
+                async for line in f:
+                    try:
+                        if (
+                            importable := cls.parse_str(
+                                line, exceptions=exceptions, **kwargs
+                            )
+                        ) is not None:
+                            yield importable
+                        else:
+                            error(
+                                "Could not parse %s from file: %s",
+                                type(cls),
+                                str(filename),
+                            )
+                    except ValidationError as err:
+                        if exceptions:
+                            raise
+        except OSError as err:
+            if exceptions:
+                raise
+            error(f"Error importing file {filename}: {err}")
+
+    async def asave_json(self, filename: Path | str, exceptions: bool = False) -> int:
+        """
+        Save an object into a JSON file
+        Uses asyncio / aiofiles.open()
+        """
+        filename = str2path(filename)
+
+        try:
+            if not filename.name.endswith(".json"):
+                filename = filename.with_suffix(".json")
+            async with aiofiles.open(filename, mode="w", encoding="utf-8") as rf:
+                return await rf.write(self.json_src())
+        except Exception as err:
+            if exceptions:
+                raise
+            error(f"Error writing file {filename}: {err}")
+        return -1
+
+    def save_json(self, filename: Path | str, exceptions: bool = False) -> int:
+        """
+        Save an object into a JSON file
+        """
+        filename = str2path(filename)
+
+        try:
+            if not filename.name.endswith(".json"):
+                filename = filename.with_suffix(".json")
+            with open(filename, mode="w", encoding="utf-8") as rf:
+                return rf.write(self.json_src())
+        except Exception as err:
+            if exceptions:
+                raise
+            error(f"Error writing file {filename}: {err}")
+        return -1
 
 
 class JSONExportableRootDict(
@@ -539,14 +663,115 @@ class JSONExportableRootDict(
         try:
             return cls.model_validate(obj)
         except ValidationError as err:
-            error("could not parse object as %s: %s", cls.__name__, str(err))
+            error("could not parse object as %s: %s", cls.__name__, err)
         return None
 
     @classmethod
-    def parse_str(cls, content: str) -> Self | None:
+    def parse_str(cls, content: str, exceptions: bool = False) -> Self | None:
         """return class instance from a JSON string"""
         try:
             return cls.model_validate_json(content, strict=True)
         except ValueError as err:
             debug(f"Could not parse {type(cls)} from JSON: {err}")
         return None
+
+    async def asave_json(self, filename: Path | str, exceptions: bool = False) -> int:
+        """
+        Save object as JSON into a file using aiofiles.open()
+        Uses asyncio / aiofiles.open()
+        """
+        filename = str2path(filename)
+
+        try:
+            if not filename.name.endswith(".json"):
+                filename = filename.with_suffix(".json")
+            async with aiofiles.open(filename, mode="w", encoding="utf-8") as f:
+                return await f.write(self.json_src())
+        except Exception as err:
+            if exceptions:
+                raise
+            error(f"Error writing file {filename}: {err}")
+        return -1
+
+    @classmethod
+    async def aopen_json(
+        cls, filename: Path | str, exceptions: bool = False
+    ) -> Self | None:
+        """
+        Open a JSON file and a return class instance
+        Uses asyncio / aiofiles.open()
+        Returns None if opening the JSON file fails or raises an Exception if exceptions=True
+        """
+        try:
+            async with aiofiles.open(filename, "r") as f:
+                return cls.model_validate_json(await f.read())
+        except ValueError as err:
+            debug(f"Could not parse {type(cls)} from file: {filename}: {err}")
+            if exceptions:
+                raise
+        except OSError as err:
+            debug(f"Error reading file: {filename}: {err}")
+            if exceptions:
+                raise
+        return None
+
+
+#############################################################
+#
+#
+#
+#############################################################
+
+
+async def export_json(
+    iterable: AsyncIterable[JSONExportable],
+    filename: Path | str,
+    force: bool = False,
+    append: bool = False,
+    exceptions: bool = False,
+) -> tuple[int, int]:
+    """
+    Export data to a JSON file as one object per line.
+    Uses asyncio / aiofiles.open()
+
+    Returns number of exported / failed
+    """
+    # assert type(filename) is str and len(filename) > 0, "filename has to be str"
+    exported: int = 0
+    errors: int = 0
+    try:
+        exportable: JSONExportable
+        if isinstance(filename, str) and filename == "-":  # STDOUT
+            async for exportable in iterable:
+                try:
+                    print(exportable.json_src(indent=4))
+                    exported += 1
+                except Exception as err:
+                    if exceptions:
+                        raise
+                    error(f"error exporting JSON type={type(exportable)}: {err}")
+                    errors += 1
+        else:  # FILE
+            filename = str2path(filename, ".json")
+            if filename.is_file() and (not (force or append)):
+                raise FileExistsError(f"Cannot export to {filename}")
+            mode: Literal["w", "a"] = "a" if append else "w"
+
+            debug("opening %s for writing in mode=%s", str(filename), mode)
+            async with aiofiles.open(filename, mode=mode) as txtfile:
+                async for exportable in iterable:
+                    try:
+                        debug("writing JSON: %s", exportable.json_src())
+                        await txtfile.write(exportable.json_src() + linesep)
+                        exported += 1
+                    except Exception as err:
+                        if exceptions:
+                            raise
+                        errors += 1
+                        error(f"Failed to export: {err}")
+
+    except Exception as err:
+        if exceptions:
+            raise
+        error(f"Failed exporting to JSON: {err}")
+    return exported, errors

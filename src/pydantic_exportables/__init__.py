@@ -1,9 +1,10 @@
 from .aliasmapper import AliasMapper as AliasMapper
 from .pyobjectid import PyObjectId as PyObjectId
-from .csvexportable import CSVExportable as CSVExportable
+from .csvexportable import CSVExportable as CSVExportable, export_csv as export_csv
 from .jsonexportable import (
     JSONExportable as JSONExportable,
     JSONExportableRootDict as JSONExportableRootDict,
+    export_json as export_json,
     TypeExcludeDict as TypeExcludeDict,
     Idx as Idx,
     TEXT as TEXT,
@@ -12,7 +13,7 @@ from .jsonexportable import (
 
 from .utils import (
     str2path as str2path,
-    # awrap as awrap,
+    awrap as awrap,
     epoch_now as epoch_now,
 )
 

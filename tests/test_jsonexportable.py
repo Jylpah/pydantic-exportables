@@ -1,13 +1,12 @@
 import pytest  # type: ignore
 from typing import Self, List, Annotated, TypeVar
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, ValidationError
 from pathlib import Path
 from datetime import date, datetime
 from enum import StrEnum, IntEnum
 from bson import ObjectId
 import json
 import logging
-import aiofiles
 
 # from unittest.mock import patch
 from pydantic_exportables import (
@@ -17,7 +16,8 @@ from pydantic_exportables import (
     AliasMapper,
     PyObjectId,
     epoch_now,
-    str2path,
+    awrap,
+    export_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,40 +34,6 @@ debug = logger.debug
 ###########################################################
 
 B = TypeVar("B", bound=BaseModel)
-
-
-async def open_json(
-    model: type[B], filename: Path | str, exceptions: bool = False
-) -> B | None:
-    """Open replay JSON file and return class instance"""
-    try:
-        async with aiofiles.open(filename, "r") as f:
-            return model.model_validate_json(await f.read())
-    except ValueError as err:
-        debug(f"Could not parse {type(model)} from file: {filename}: {err}")
-        if exceptions:
-            raise
-    except OSError as err:
-        debug(f"Error reading file: {filename}: {err}")
-        if exceptions:
-            raise
-    return None
-
-
-async def save_json(
-    obj: JSONExportable | JSONExportableRootDict, filename: Path | str
-) -> int:
-    """Save object JSON into a file"""
-    filename = str2path(filename)
-    #
-    try:
-        if not filename.name.endswith(".json"):
-            filename = filename.with_suffix(".json")
-        async with aiofiles.open(filename, mode="w", encoding="utf-8") as rf:
-            return await rf.write(obj.json_src())
-    except Exception as err:
-        error(f"Error writing file {filename}: {err}")
-    return -1
 
 
 class FakeAsyncFile:
@@ -351,56 +317,170 @@ def json_adults() -> List[JSONAdult]:
 #     return res
 
 
-# @pytest.mark.asyncio
-# async def test_1_json_exportable_import_save(
-#     tmp_path: Path, json_parents: List[JSONParent]
-# ):
-#     fn: Path = tmp_path / "export.json"
+@pytest.mark.asyncio
+async def test_1_aimport_aexport(tmp_path: Path, json_parents: List[JSONParent]):
+    fn: Path = tmp_path / "export.json"
 
-#     await export(awrap(json_parents), format="json", filename="-")  # type: ignore
-#     await export(awrap(json_parents), format="json", filename=fn)  # type: ignore
-#     await export(
-#         awrap(json_parents), format="json", filename=str(fn.resolve()), force=True
-#     )  # type: ignore
+    await export_json(awrap(json_parents), filename="-")
+    await export_json(awrap(json_parents), filename=fn)
+    await export_json(awrap(json_parents), filename=str(fn.resolve()), force=True)
 
-#     imported: set[JSONParent] = set()
-#     try:
-#         async for p_in in JSONParent.import_file(fn):
-#             imported.add(p_in)
-#     except Exception as err:
-#         assert False, f"failed to import test data: {err}"
+    imported: set[JSONParent] = set()
+    try:
+        async for p in JSONParent.aimport_json(fn):
+            imported.add(p)
+    except Exception as err:
+        assert False, f"failed to import test data: {err}"
 
-#     for data in json_parents:
-#         try:
-#             imported.remove(data)
-#         except Exception as err:
-#             assert False, f"could not export or import item: {data}: {err}"
+    for data in json_parents:
+        try:
+            imported.remove(data)
+        except Exception as err:
+            assert False, f"could not export or import item: {data}: {err}"
 
-#     assert len(imported) == 0, "Export or import failed"
+    assert len(imported) == 0, "Export or import failed"
 
-#     for parent in json_parents:
-#         assert await parent.save_json(fn) > 0, (
-#             f"could not save JSONExportable: {str(parent)}"
-#         )
-#         assert (parent_imported := await JSONParent.open_json(fn)) is not None, (
-#             f"could not import save json: {str(parent)}"
-#         )
-#         assert parent == parent_imported, (
-#             f"imported data does not match original: original={parent}, imported={parent_imported}"
-#         )
-#         assert (adult := await JSONAdult.open_json(fn)) is None, (
-#             f"open_json() returned instance even it should not: {adult}"
-#         )
+    # test aimport_json() from a non-existing file with exceptions
+    try:
+        async for p in JSONParent.aimport_json(
+            tmp_path / "not-existing-asg3sgfawsef.json", exceptions=True
+        ):
+            imported.add(p)
+        assert False, "aimport_open() did not raise OSError with non-exsting filename"
+    except OSError:
+        pass
+    except Exception as err:
+        assert False, f"failed to import test data: {err}"
 
-#     parent = json_parents[0]
-#     assert await parent.save_json(fn.with_suffix("")) > 0, (
-#         f"could not save JSONExportable: {str(parent)}"
-#     )
+    # test aimport_json() from a non-existing file w/o exceptions
+    try:
+        async for p in JSONParent.aimport_json(
+            tmp_path / "not-existing-asg3sgfawsef.json", exceptions=False
+        ):
+            imported.add(p)
+        assert len(imported) == 0, (
+            f"aimport_open() imported {len(imported)} items from a non-existent file"
+        )
+    except OSError:
+        pass
+    except Exception as err:
+        assert False, f"failed to import test data: {err}"
 
-#     # Test for opening non-existent file
-#     assert (
-#         adult := await JSONAdult.open_json(fn.with_suffix(".not-found.json"))
-#     ) is None, f"open_json() returned instance from non-existent file: {adult}"
+    adults: set[JSONAdult] = set()
+    # test aimport_json() with wrong model with exception
+    try:
+        async for a in JSONAdult.aimport_json(fn, exceptions=True):
+            adults.add(a)
+        assert False, (
+            "aimport_open() did not raise ValidationError with incompatible data"
+        )
+    except ValidationError:
+        pass
+    except Exception as err:
+        assert False, (
+            f"aimport_open() did not raise ValidationError, but {type(err)} on incompatible data: {err}"
+        )
+
+    # test aimport_json() with wrong model w/o exception
+    try:
+        async for a in JSONAdult.aimport_json(fn, exceptions=False):
+            adults.add(a)
+        assert len(adults) == 0, (
+            f"aimport_json() imported {len(adults)} items from a non-existing file"
+        )
+    except ValidationError:
+        pass
+    except Exception as err:
+        assert False, (
+            f"aimport_open() did not raise ValidationError, but {type(err)} on incompatible data: {err}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_2_asave_aopen(tmp_path: Path, json_parents: List[JSONParent]):
+    fn: Path = tmp_path / "export.json"
+
+    for parent in json_parents:
+        assert await parent.asave_json(fn) > 0, (
+            f"could not save JSONExportable: {str(parent)}"
+        )
+        assert (parent_imported := await JSONParent.aopen_json(fn)) is not None, (
+            f"could not import save json: {str(parent)}"
+        )
+        assert parent == parent_imported, (
+            f"imported data does not match original: original={parent}, imported={parent_imported}"
+        )
+        assert (adult := await JSONAdult.aopen_json(fn)) is None, (
+            f"open_json() returned instance even it should not: {adult}"
+        )
+        try:
+            assert (adult := await JSONAdult.aopen_json(fn, exceptions=True)) is None, (
+                f"open_json() returned instance even it should not: {adult}"
+            )
+            assert False, (
+                "aopen_json(exception=True) did not raise exception for wrong model type even it should have"
+            )
+        except Exception:
+            pass
+    parent = json_parents[0]
+    assert await parent.asave_json(fn.with_suffix("")) > 0, (
+        f"could not save JSONExportable: {str(parent)}"
+    )
+
+    # Test for opening non-existent file
+    assert (
+        adult := await JSONAdult.aopen_json(fn.with_suffix(".not-found.json"))
+    ) is None, f"open_json() returned instance from non-existent file: {adult}"
+    try:
+        adult = await JSONAdult.aopen_json(
+            fn.with_suffix(".not-found.json"), exceptions=True
+        )
+        assert False, "aopen_json() did not raise exception on non-existing filename"
+    except OSError:
+        pass
+    except Exception:
+        raise
+
+
+def test_3_save_open(tmp_path: Path, json_parents: List[JSONParent]):
+    fn: Path = tmp_path / "export.json"
+
+    for parent in json_parents:
+        assert parent.save_json(fn) > 0, f"could not save JSONExportable: {str(parent)}"
+        assert (parent_imported := JSONParent.open_json(fn)) is not None, (
+            f"could not import save json: {str(parent)}"
+        )
+        assert parent == parent_imported, (
+            f"imported data does not match original: original={parent}, imported={parent_imported}"
+        )
+        assert (adult := JSONAdult.open_json(fn)) is None, (
+            f"open_json() returned instance even it should not: {adult}"
+        )
+        try:
+            assert (adult := JSONAdult.open_json(fn, exceptions=True)) is None, (
+                f"open_json() returned instance even it should not: {adult}"
+            )
+            assert False, (
+                "aopen_json(exception=True) did not raise exception for wrong model type even it should have"
+            )
+        except Exception:
+            pass
+    parent = json_parents[0]
+    assert parent.save_json(fn.with_suffix("")) > 0, (
+        f"could not save JSONExportable: {str(parent)}"
+    )
+
+    # Test for opening non-existent file
+    assert (adult := JSONAdult.open_json(fn.with_suffix(".not-found.json"))) is None, (
+        f"open_json() returned instance from non-existent file: {adult}"
+    )
+    try:
+        adult = JSONAdult.open_json(fn.with_suffix(".not-found.json"), exceptions=True)
+        assert False, "aopen_json() did not raise exception on non-existing filename"
+    except OSError:
+        pass
+    except Exception:
+        raise
 
 
 # @pytest.mark.asyncio
@@ -507,7 +587,7 @@ def json_adults() -> List[JSONAdult]:
 
 
 @pytest.mark.asyncio
-async def test_2_json_exportable_include_exclude() -> None:
+async def test_4_include_exclude() -> None:
     # test for custom include/exclude
     parent = JSONParent(
         name="Jack", years=26, married=True, child=JSONChild(name="Nick")
@@ -586,47 +666,7 @@ async def test_2_json_exportable_include_exclude() -> None:
     )
 
 
-def test_3_jsonexportable_update(json_parents: List[JSONParent]):
-    """
-    test for JSONExportable.update()
-    """
-    p0: JSONParent = json_parents[0]
-    p1: JSONParent = json_parents[1]
-    p2: JSONParent = json_parents[2]
-
-    p: JSONParent = p0.model_copy(deep=True)
-
-    for new in json_parents[1:]:
-        assert not p.update(new, match_index=True), (
-            "update succeeded even the indexes do not match"
-        )
-    assert p.update(p1, match_index=False), (
-        "update did not succeeded even the indexes were ignored"
-    )
-    assert all(
-        [
-            p.name == p1.name,
-            p.years == p1.years,
-            p.married == p1.married,
-            p.array == p1.array,
-            p.child == p0.child,
-        ]
-    ), f"update() failed: updated={str(p)}"
-    assert p.update(p2, match_index=False), (
-        "update did not succeeded even the indexes were ignored"
-    )
-    assert all(
-        [
-            p.name == p2.name,
-            p.years == p2.years,
-            p.married == p2.married,
-            p.array == p1.array,
-            p.child == p2.child,
-        ]
-    ), f"update() failed: updated={str(p)}"
-
-
-def test_4_jsonexportable_transform(json_adults: List[JSONAdult]):
+def test_5_transform(json_adults: List[JSONAdult]):
     res = JSONParent.transform_many(json_adults)
     N: int = len(json_adults)
     assert len(res) == N, f"could not transform all data: {len(res)} != {N}"
@@ -640,7 +680,7 @@ def test_4_jsonexportable_transform(json_adults: List[JSONAdult]):
     assert len(res3) == N, f"from_objs(in_type=JSONAdult) failed: {len(res)} != {N}"
 
 
-def test_5_jsonexportable_transform_fails(json_parents: List[JSONParent]):
+def test_6_transform_fails(json_parents: List[JSONParent]):
     res = JSONAdult.transform_many(json_parents)
     assert len(res) == 0, f"transform data it should have not: {len(res)} != 0"
 
@@ -652,12 +692,21 @@ def test_5_jsonexportable_transform_fails(json_parents: List[JSONParent]):
     )
 
 
-def test_6_parse_str(json_parents: List[JSONParent]) -> None:
+def test_7_parse_str(json_parents: List[JSONParent]) -> None:
     for parent in json_parents:
         # test failure
         assert (_ := JSONAdult.parse_str(parent.json_src())) is None, (
             f"parse_str() returned instance from faulty data: {parent.json_src()}"
         )
+        try:
+            _ = JSONAdult.parse_str(parent.json_src(), exceptions=True)
+            assert False, (
+                f"parse_str() did not raise except instance from faulty data: {parent.json_src()}"
+            )
+        except ValidationError:
+            pass
+        except Exception:
+            raise
         # test success
         json_str: str = parent.json_src()
         parsed: JSONParent | None = JSONParent.parse_str(json_str)
@@ -665,69 +714,6 @@ def test_6_parse_str(json_parents: List[JSONParent]) -> None:
         assert parsed == parent, (
             f"parse_str() returned different object than original: {parsed} != {parent}"
         )
-
-
-def test_7_jsonexportablerootdict(json_parents: List[JSONParent]) -> None:
-    family = JSONNeighbours()
-    for parent in json_parents:
-        family.add(parent)
-
-    assert len(family) == len(json_parents), (
-        f"could not add all the list members: {family} != {len(json_parents)}"
-    )
-
-    family2 = JSONNeighbours()
-    parent = JSONParent(
-        name="Erik",
-        years=28,
-        child=None,
-    )
-    family2[parent.name] = parent
-    family2.add(
-        JSONParent(
-            name="Betty",
-            years=26,
-            child=JSONChild(
-                name="Elisabeth",
-                born=int(
-                    datetime(year=2009, month=6, day=4, hour=13, minute=56).timestamp()
-                ),
-            ),
-        )
-    )
-    added, updated = family.update(family2)
-    assert len(added) == 1 and len(updated) == 1, "update() failed"
-    assert family[parent.name].name == parent.name, "__get_item__() failed"
-    if parent in family:
-        pass
-    if parent.name in family:
-        del family[parent.name]
-    else:
-        assert False, f"item '{parent.name}' not found in family even it should"
-
-    for name, parent in family.items():
-        assert name == parent.name, "wrong item returned"
-
-    assert len(family) == len(family.values()), (
-        f"values() returned incorrect number of items: {len(family)} != {len(family.values())}"
-    )
-
-    assert (_ := JSONNeighbours.from_obj(family.obj_src())) is not None, (
-        f"could not recreate JSONExportableRootDict() from obj_src(): {str(family.obj_src())}"
-    )
-
-    assert (_ := JSONNeighbours.from_obj(family.obj_db())) is not None, (
-        f"could not recreate JSONExportableRootDict() from obj_db(): {str(family.obj_db())}"
-    )
-
-    # debug(family.json_src())
-    assert (_ := JSONNeighbours.parse_str(family.json_src())) is not None, (
-        f"could not parse JSONExportableRootDict() from json_src(): {family.json_src()}"
-    )
-
-    assert (_ := JSONNeighbours.parse_str(family.json_db())) is not None, (
-        f"could not parse JSONExportableRootDict() from json_db(): {family.json_db()}"
-    )
 
 
 def test_8_export_helper_edge_cases() -> None:
@@ -767,6 +753,15 @@ def test_9_from_obj_validation_error() -> None:
     assert JSONParent.from_obj(invalid_data) is None, (
         "from_obj() should return None for invalid data"
     )
+    try:
+        _ = JSONParent.from_obj(invalid_data, exceptions=True)
+        assert False, "from_obj() did not raise ValidationError as it should have"
+    except ValidationError:
+        pass  # OK
+    except Exception as err:
+        assert False, (
+            f"from_obj() did not raise ValidationError, but {type(err)}: {err}"
+        )
 
 
 def test_10_transform_exception_handling() -> None:
@@ -830,11 +825,11 @@ async def test_13_IntasIdx(tmp_path: Path) -> None:
 
     debug(d.json_src(exclude_defaults=False))
     assert len(d) == L, f"could not add all the items: {len(d)} != {L}"
-    assert await save_json(d, export_fn) > 0, (
+    assert await d.asave_json(export_fn) > 0, (
         "could not export IntIdxExportableDict to JSON"
     )
 
-    assert (imported := await open_json(IntIdxExportableDict, export_fn)) is not None, (
+    assert (imported := await IntIdxExportableDict.aopen_json(export_fn)) is not None, (
         "could not import IntIdxExportableDict from JSON"
     )
 
@@ -849,7 +844,7 @@ async def test_13_IntasIdx(tmp_path: Path) -> None:
         )
 
 
-def test_14_jsonexportable_hash():
+def test_14_hash():
     parent1 = JSONParent(name="Alice", years=30)
     parent2 = JSONParent(name="Alice", years=35)
     parent3 = JSONParent(name="Bob", years=30)
@@ -869,8 +864,13 @@ def test_14_jsonexportable_hash():
         "__hash__() failed: hashable objects should still be distinguished by identity when __eq__ is not overridden"
     )
 
+    adult = JSONAdult(name="Bob", age=38)
+    assert hash(adult) == hash(id(adult)), (
+        "__hash__() did not return correct hash for a class without 'index' property"
+    )
 
-def test_15_flatten_jsonexportable() -> None:
+
+def test_15_flatten() -> None:
     child = JSONChild(name="Child", born=1234567890)
     parent = JSONParent(
         name="Parent",
@@ -916,7 +916,7 @@ def test_15_flatten_jsonexportable() -> None:
     )
 
 
-def test_16_jsonexportable_from_flattened():
+def test_16_from_flattened():
     child = JSONChild(name="Child", born=1234567890)
     parent = JSONParent(
         name="Parent",
@@ -932,7 +932,7 @@ def test_16_jsonexportable_from_flattened():
     assert parent_new == parent, "from_flattened() did not reverse flatten()"
 
 
-def test_17_jsonexportable_from_flattened_custom_separator():
+def test_17_from_flattened_custom_separator():
     child = JSONChild(name="Child", born=1234567890)
     parent = JSONParent(
         name="Parent",
@@ -950,7 +950,7 @@ def test_17_jsonexportable_from_flattened_custom_separator():
     )
 
 
-def test_18_jsonexportable_from_flattened_numeric_dict_keys() -> None:
+def test_18_from_flattened_numeric_dict_keys() -> None:
     class JSONNumericDict(JSONExportable):
         name: str
         scores: dict[int, str]
@@ -967,7 +967,7 @@ def test_18_jsonexportable_from_flattened_numeric_dict_keys() -> None:
     assert obj_new == obj, "from_flattened() converted numeric dict keys incorrectly"
 
 
-def test_19_jsonexportable_from_flattened(json_parents: List[JSONParent]) -> None:
+def test_19_from_flattened(json_parents: List[JSONParent]) -> None:
     for parent in json_parents:
         flat_dict = parent.flatten()
         assert isinstance(flat_dict, dict), "flatten() should return a dictionary"
@@ -975,6 +975,116 @@ def test_19_jsonexportable_from_flattened(json_parents: List[JSONParent]) -> Non
         assert parent == JSONParent.from_flattened(flat_dict), (
             "from_flattened() did not reverse flatten() correctly"
         )
+
+
+def test_20_update(json_parents: List[JSONParent]):
+    """
+    test for JSONExportable.update()
+    """
+    p0: JSONParent = json_parents[0]
+    p1: JSONParent = json_parents[1]
+    p2: JSONParent = json_parents[2]
+
+    p: JSONParent = p0.model_copy(deep=True)
+
+    for new in json_parents[1:]:
+        assert not p.update(new, match_index=True), (
+            "update succeeded even the indexes do not match"
+        )
+    assert p.update(p1, match_index=False), (
+        "update did not succeeded even the indexes were ignored"
+    )
+    assert all(
+        [
+            p.name == p1.name,
+            p.years == p1.years,
+            p.married == p1.married,
+            p.array == p1.array,
+            p.child == p0.child,
+        ]
+    ), f"update() failed: updated={str(p)}"
+    assert p.update(p2, match_index=False), (
+        "update did not succeeded even the indexes were ignored"
+    )
+    assert all(
+        [
+            p.name == p2.name,
+            p.years == p2.years,
+            p.married == p2.married,
+            p.array == p1.array,
+            p.child == p2.child,
+        ]
+    ), f"update() failed: updated={str(p)}"
+
+
+#################################################################
+#
+#  JSONExportableRootDict()
+#
+#################################################################
+
+
+def test_20_jsonexportablerootdict(json_parents: List[JSONParent]) -> None:
+    family = JSONNeighbours()
+    for parent in json_parents:
+        family.add(parent)
+
+    assert len(family) == len(json_parents), (
+        f"could not add all the list members: {family} != {len(json_parents)}"
+    )
+
+    family2 = JSONNeighbours()
+    parent = JSONParent(
+        name="Erik",
+        years=28,
+        child=None,
+    )
+    family2[parent.name] = parent
+    family2.add(
+        JSONParent(
+            name="Betty",
+            years=26,
+            child=JSONChild(
+                name="Elisabeth",
+                born=int(
+                    datetime(year=2009, month=6, day=4, hour=13, minute=56).timestamp()
+                ),
+            ),
+        )
+    )
+    added, updated = family.update(family2)
+    assert len(added) == 1 and len(updated) == 1, "update() failed"
+    assert family[parent.name].name == parent.name, "__get_item__() failed"
+    if parent in family:
+        pass
+    if parent.name in family:
+        del family[parent.name]
+    else:
+        assert False, f"item '{parent.name}' not found in family even it should"
+
+    for name, parent in family.items():
+        assert name == parent.name, "wrong item returned"
+
+    assert len(family) == len(family.values()), (
+        f"values() returned incorrect number of items: {len(family)} != {len(family.values())}"
+    )
+
+    assert (_ := JSONNeighbours.from_obj(family.obj_src())) is not None, (
+        f"could not recreate JSONExportableRootDict() from obj_src(): {str(family.obj_src())}"
+    )
+
+    assert (_ := JSONNeighbours.from_obj(family.obj_db())) is not None, (
+        f"could not recreate JSONExportableRootDict() from obj_db(): {str(family.obj_db())}"
+    )
+
+    # debug(family.json_src())
+    assert (_ := JSONNeighbours.parse_str(family.json_src())) is not None, (
+        f"could not parse JSONExportableRootDict() from json_src(): {family.json_src()}"
+    )
+
+    assert (_ := JSONNeighbours.parse_str(family.json_db())) is not None, (
+        f"could not parse JSONExportableRootDict() from json_db(): {family.json_db()}"
+    )
 
 
 # @pytest.mark.asyncio
