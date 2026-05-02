@@ -486,7 +486,7 @@ class JSONExportable(BaseModel):
                                 type(cls),
                                 str(filename),
                             )
-                    except ValidationError as err:
+                    except ValidationError:
                         if exceptions:
                             raise
         except OSError as err:
@@ -656,13 +656,15 @@ class JSONExportableRootDict(
         return res
 
     @classmethod
-    def from_obj(cls, obj: Any) -> Optional[Self]:
+    def from_obj(cls, obj: Any, exceptions: bool = False) -> Optional[Self]:
         """Parse instance from raw object.
         Returns None if reading from object failed.
         """
         try:
             return cls.model_validate(obj)
         except ValidationError as err:
+            if exceptions:
+                raise
             error("could not parse object as %s: %s", cls.__name__, err)
         return None
 

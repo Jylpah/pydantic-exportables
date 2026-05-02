@@ -89,7 +89,14 @@ class JSONParent(JSONExportable):
     years: int = Field(default=37, alias="y")
     married: bool = Field(default=True, alias="m")
     array: List[str] = Field(default_factory=list, alias="a")
-    child: JSONChild | None = Field(default=None, alias="c")
+    pets: set[str] = Field(default_factory=set, alias="p")
+    car: tuple[str, int] = Field(default=("-", -1), alias="ca")
+    first_child: JSONChild | None = Field(default=None, alias="c")
+
+    children: list[JSONChild] = Field(default_factory=list, alias="cl")
+    parents: tuple[JSONChild | None, JSONChild | None] = Field(
+        default=(None, None), alias="pt"
+    )
 
     _exclude_unset = False
 
@@ -108,7 +115,7 @@ class JSONAdult(JSONExportable):
 
     def transform2JSONParent(self) -> JSONParent:
         return JSONParent(
-            name=self.name, years=self.age, married=self.married, child=None
+            name=self.name, years=self.age, married=self.married, first_child=None
         )
 
 
@@ -237,9 +244,9 @@ def json_parents() -> List[JSONParent]:
     c1 = JSONChild(name="c1")
     c3 = JSONChild(name="c3")
     res: List[JSONParent] = list()
-    res.append(JSONParent(name="Erik", years=1, array=["one", "two"], child=c1))
+    res.append(JSONParent(name="Erik", years=1, array=["one", "two"], first_child=c1))
     res.append(JSONParent(name="Mia", years=-6, array=["three", "four"]))
-    res.append(JSONParent(name="Jack", years=-6, child=c3))
+    res.append(JSONParent(name="Jack", years=-6, first_child=c3))
     return res
 
 
@@ -590,7 +597,7 @@ def test_3_save_open(tmp_path: Path, json_parents: List[JSONParent]):
 async def test_4_include_exclude() -> None:
     # test for custom include/exclude
     parent = JSONParent(
-        name="Jack", years=26, married=True, child=JSONChild(name="Nick")
+        name="Jack", years=26, married=True, first_child=JSONChild(name="Nick")
     )
 
     mapper = AliasMapper(JSONParent)
@@ -605,7 +612,7 @@ async def test_4_include_exclude() -> None:
         "json_db() failed: _exclude_defaults set 'True', 'c' included"
     )
 
-    for excl, incl in zip(["child", None], ["name", None]):
+    for excl, incl in zip(["first_child", None], ["name", None]):
         kwargs: dict[str, set[str]] = dict()
         if excl is not None:
             kwargs["exclude"] = {excl}
@@ -722,7 +729,7 @@ def test_8_export_helper_edge_cases() -> None:
         years=25,
         married=True,
         array=["a", "b"],
-        child=JSONChild(name="Kid"),
+        first_child=JSONChild(name="Kid"),
     )
 
     # Test with both include and exclude in kwargs
@@ -871,13 +878,20 @@ def test_14_hash():
 
 
 def test_15_flatten() -> None:
-    child = JSONChild(name="Child", born=1234567890)
+    bob = JSONChild(name="bob", born=1234567890)
+    mom = JSONChild(name="susan")
+    dad = JSONChild(name="dirk")
+    matt = JSONChild(name="matt", born=111111111)
     parent = JSONParent(
         name="Parent",
         years=40,
         married=True,
         array=["a", "b"],
-        child=child,
+        first_child=bob,
+        car=("audi", 5),
+        pets={"fluffy", "barky"},
+        children=[bob, matt],
+        parents=(mom, dad),
     )
 
     flat_dict = parent.flatten()
@@ -887,8 +901,20 @@ def test_15_flatten() -> None:
         "married",
         "array[].0",
         "array[].1",
-        "child.name",
-        "child.born",
+        "car().0",
+        "car().1",
+        "children[].0.name",
+        "children[].0.born",
+        "children[].1.name",
+        "children[].1.born",
+        "first_child.name",
+        "first_child.born",
+        "parents().0.name",
+        "parents().0.born",
+        "parents().1.name",
+        "parents().1.born",
+        "pets{}.0",
+        "pets{}.1",
     }
     assert set(flat_dict.keys()) == expected_keys, (
         f"flattened_dict() returned incorrect keys: {set(flat_dict.keys())} != {expected_keys}"
@@ -908,11 +934,12 @@ def test_15_flatten() -> None:
     assert flat_dict["array[].1"] == parent.array[1], (
         "flattened_dict() returned incorrect value for 'array'"
     )
-    assert parent.child is not None and flat_dict["child.name"] == parent.child.name, (
-        "flattened_dict() returned incorrect value for 'child.name'"
-    )
-    assert flat_dict["child.born"] == parent.child.born, (
-        "flattened_dict() returned incorrect value for 'child.born'"
+    assert (
+        parent.first_child is not None
+        and flat_dict["first_child.name"] == parent.first_child.name
+    ), "flattened_dict() returned incorrect value for 'child.name'"
+    assert flat_dict["first_child.born"] == parent.first_child.born, (
+        "flattened_dict() returned incorrect value for 'first_child.born'"
     )
 
 
@@ -923,7 +950,9 @@ def test_16_from_flattened():
         years=40,
         married=True,
         array=["a", "b"],
-        child=child,
+        pets={"donald", "buff"},
+        car=("toyota", 7),
+        first_child=child,
     )
 
     assert (parent_new := JSONParent.from_flattened(parent.flatten())) is not None, (
@@ -939,7 +968,7 @@ def test_17_from_flattened_custom_separator():
         years=40,
         married=True,
         array=["a", "b"],
-        child=child,
+        first_child=child,
     )
 
     assert (
@@ -1000,7 +1029,7 @@ def test_20_update(json_parents: List[JSONParent]):
             p.years == p1.years,
             p.married == p1.married,
             p.array == p1.array,
-            p.child == p0.child,
+            p.first_child == p0.first_child,
         ]
     ), f"update() failed: updated={str(p)}"
     assert p.update(p2, match_index=False), (
@@ -1012,7 +1041,7 @@ def test_20_update(json_parents: List[JSONParent]):
             p.years == p2.years,
             p.married == p2.married,
             p.array == p1.array,
-            p.child == p2.child,
+            p.first_child == p2.first_child,
         ]
     ), f"update() failed: updated={str(p)}"
 
@@ -1037,14 +1066,14 @@ def test_20_jsonexportablerootdict(json_parents: List[JSONParent]) -> None:
     parent = JSONParent(
         name="Erik",
         years=28,
-        child=None,
+        first_child=None,
     )
     family2[parent.name] = parent
     family2.add(
         JSONParent(
             name="Betty",
             years=26,
-            child=JSONChild(
+            first_child=JSONChild(
                 name="Elisabeth",
                 born=int(
                     datetime(year=2009, month=6, day=4, hour=13, minute=56).timestamp()
