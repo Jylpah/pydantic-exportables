@@ -16,7 +16,7 @@ from pydantic_exportables import (
     AliasMapper,
     PyObjectId,
     epoch_now,
-    awrap,
+    awrap_gen,
     export_json,
 )
 
@@ -328,9 +328,9 @@ def json_adults() -> List[JSONAdult]:
 async def test_1_aimport_aexport(tmp_path: Path, json_parents: List[JSONParent]):
     fn: Path = tmp_path / "export.json"
 
-    await export_json(awrap(json_parents), filename="-")
-    await export_json(awrap(json_parents), filename=fn)
-    await export_json(awrap(json_parents), filename=str(fn.resolve()), force=True)
+    await export_json(awrap_gen(json_parents), filename="-")
+    await export_json(awrap_gen(json_parents), filename=fn)
+    await export_json(awrap_gen(json_parents), filename=str(fn.resolve()), force=True)
 
     imported: set[JSONParent] = set()
     try:
@@ -498,7 +498,7 @@ def test_3_save_open(tmp_path: Path, json_parents: List[JSONParent]):
 #     fake_open = FakeAsyncOpen()
 
 #     with patch("pydantic_exportables.jsonexportable.open", side_effect=fake_open):
-#         stats = await export_json(awrap(json_parents), fn)  # type: ignore[arg-type]
+#         stats = await export_json(awrap_gen(json_parents), fn)  # type: ignore[arg-type]
 
 #     assert stats.get("rows") == len(json_parents), (
 #         f"export_json() logged wrong row count: {stats.get('rows')}"
@@ -529,8 +529,8 @@ def test_3_save_open(tmp_path: Path, json_parents: List[JSONParent]):
 #     fake_open = FakeAsyncOpen()
 
 #     with patch("pydantic_exportables.jsonexportable.open", side_effect=fake_open):
-#         first_stats = await export_json(awrap(json_parents[:1]), fn)  # type: ignore[arg-type]
-#         append_stats = await export_json(awrap(json_parents[1:]), fn, append=True)  # type: ignore[arg-type]
+#         first_stats = await export_json(awrap_gen(json_parents[:1]), fn)  # type: ignore[arg-type]
+#         append_stats = await export_json(awrap_gen(json_parents[1:]), fn, append=True)  # type: ignore[arg-type]
 
 #     assert first_stats.get("rows") == 1, (
 #         f"initial export logged wrong row count: {first_stats.get('rows')}"
@@ -559,10 +559,10 @@ def test_3_save_open(tmp_path: Path, json_parents: List[JSONParent]):
 #     fake_open = FakeAsyncOpen("old-data\n")
 
 #     with pytest.raises(FileExistsError):
-#         await export_json(awrap(json_parents), fn)  # type: ignore[arg-type]
+#         await export_json(awrap_gen(json_parents), fn)  # type: ignore[arg-type]
 
 #     with patch("pydantic_exportables.jsonexportable.open", side_effect=fake_open):
-#         stats = await export_json(awrap(json_parents[:1]), fn, force=True)  # type: ignore[arg-type]
+#         stats = await export_json(awrap_gen(json_parents[:1]), fn, force=True)  # type: ignore[arg-type]
 
 #     assert stats.get("rows") == 1, (
 #         f"forced export logged wrong row count: {stats.get('rows')}"
@@ -577,7 +577,7 @@ def test_3_save_open(tmp_path: Path, json_parents: List[JSONParent]):
 # async def test_export_json_stdout(capsys: pytest.CaptureFixture[str]) -> None:
 #     parent = JSONParent(name="Erik", years=1, array=["one", "two"])
 
-#     stats = await export_json(awrap([parent]), "-")  # type: ignore[arg-type]
+#     stats = await export_json(awrap_gen([parent]), "-")  # type: ignore[arg-type]
 
 #     captured = capsys.readouterr()
 #     assert captured.out.strip() == parent.json_src(indent=4), (
@@ -1184,9 +1184,9 @@ def test_20_jsonexportablerootdict(json_parents: List[JSONParent]) -> None:
 # async def test_18_txt_exportable_importable(tmp_path: Path, txt_data: List[TXTPerson]):
 #     fn: Path = tmp_path / "export.txt"
 
-#     await export(awrap(txt_data), "txt", filename="-")  # type: ignore
-#     await export(awrap(txt_data), "txt", filename=fn)  # type: ignore
-#     await export(awrap(txt_data), format="txt", filename=str(fn.resolve()), force=True)  # type: ignore
+#     await export(awrap_gen(txt_data), "txt", filename="-")  # type: ignore
+#     await export(awrap_gen(txt_data), "txt", filename=fn)  # type: ignore
+#     await export(awrap_gen(txt_data), format="txt", filename=str(fn.resolve()), force=True)  # type: ignore
 
 #     imported: set[TXTPerson] = set()
 #     try:
@@ -1214,9 +1214,9 @@ def test_20_jsonexportablerootdict(json_parents: List[JSONParent]) -> None:
 # async def test_19_csv_exportable_importable(tmp_path: Path, csv_data: List[CSVPerson]):
 #     fn: Path = tmp_path / "export.csv"
 
-#     await export(awrap(csv_data), "csv", filename="-")  # type: ignore
-#     await export(awrap(csv_data), "csv", filename=fn)  # type: ignore
-#     await export(awrap(csv_data), "csv", filename=str(fn.resolve()), force=True)  # type: ignore
+#     await export(awrap_gen(csv_data), "csv", filename="-")  # type: ignore
+#     await export(awrap_gen(csv_data), "csv", filename=fn)  # type: ignore
+#     await export(awrap_gen(csv_data), "csv", filename=str(fn.resolve()), force=True)  # type: ignore
 
 #     imported: set[CSVPerson] = set()
 #     try:
