@@ -22,8 +22,11 @@ from typing import (
     Generic,
     Callable,
     Sequence,
+    get_args,
+    get_origin,
 )
 from enum import StrEnum
+from enum import Enum
 from collections.abc import ItemsView, ValuesView, KeysView
 from collections.abc import MutableMapping
 from os import linesep
@@ -34,6 +37,7 @@ from pydantic import (
     ConfigDict,
     Field,
 )
+from types import UnionType
 import aiofiles
 
 # from deprecated import deprecated
@@ -266,6 +270,67 @@ class JSONExportable(BaseModel):
         return unflattened representation of the object
         """
 
+        def _optional_inner(annotation: Any) -> tuple[Any, bool]:
+            origin = get_origin(annotation)
+            if origin in (Union, UnionType):
+                args = get_args(annotation)
+                non_none_args = [arg for arg in args if arg is not type(None)]
+                if len(non_none_args) == 1 and len(non_none_args) != len(args):
+                    return non_none_args[0], True
+            return annotation, False
+
+        def _is_empty(value: Any) -> bool:
+            if value in ("", None):
+                return True
+            if isinstance(value, dict):
+                return all(_is_empty(item) for item in value.values())
+            return False
+
+        def _coerce_string_values(annotation: Any, value: Any) -> Any:
+            annotation, is_optional = _optional_inner(annotation)
+            if is_optional and _is_empty(value):
+                return None
+            if value == "":
+                return None
+
+            try:
+                if isinstance(annotation, type) and issubclass(annotation, Enum):
+                    for member in annotation:
+                        if str(member.value) == value:
+                            return member.value
+            except TypeError:
+                pass
+
+            try:
+                if (
+                    isinstance(annotation, type)
+                    and issubclass(annotation, BaseModel)
+                    and isinstance(value, dict)
+                ):
+                    return {
+                        field_name: _coerce_string_values(
+                            field_info.annotation,
+                            value[field_name],
+                        )
+                        for field_name, field_info in annotation.model_fields.items()
+                        if field_name in value
+                    }
+            except TypeError:
+                pass
+
+            return value
+
+        def _coerce_tree(
+            model_type: type[BaseModel], tree: dict[str, Any]
+        ) -> dict[str, Any]:
+            return {
+                field_name: _coerce_string_values(
+                    field_info.annotation, tree[field_name]
+                )
+                for field_name, field_info in model_type.model_fields.items()
+                if field_name in tree
+            }
+
         def _parse_tree(flat_dict: dict[str, Any]) -> dict[str, Any]:
             tree: dict[str, Any] = dict()
             for key, value in flat_dict.items():
@@ -337,9 +402,8 @@ class JSONExportable(BaseModel):
                 del tree[key]
             tree[key] = _unflatten(value)
         if from_str:
-            return cls.model_validate_strings(
-                tree, by_alias=by_alias, by_name=not by_alias
-            )
+            tree = _coerce_tree(cls, tree)
+            return cls.model_validate(tree, by_alias=by_alias, by_name=not by_alias)
         else:
             return cls.model_validate(tree, by_alias=by_alias, by_name=not by_alias)
 
