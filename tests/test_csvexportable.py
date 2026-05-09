@@ -101,6 +101,24 @@ async def test_csvexportable_export_import(
 
 
 @pytest.mark.asyncio
+async def test_export_csv_writes_to_stdout_for_dash_filename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    people = [CSVPerson(name="Ada"), CSVPerson(name="Bob")]
+
+    exported, errors = await export_csv(filename="-", iterable=people)
+
+    assert (exported, errors) == (2, 0)
+    assert capsys.readouterr().out == (
+        "name,bday,gender,height,weight\n"
+        "Ada,,,,\n"
+        "Bob,,,,\n"
+    )
+    assert not (tmp_path / "-").exists()
+
+
+@pytest.mark.asyncio
 async def test_utils_import_csv_wrapper(tmp_path: Path) -> None:
     filename = tmp_path / "people.csv"
     filename.write_text("name,age,child.name\nAda,37,Eve\n", encoding="utf-8")
