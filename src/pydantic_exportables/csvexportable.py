@@ -5,15 +5,29 @@
 ########################################################
 
 import logging
+from typing import (
+    AsyncGenerator,
+    AsyncIterable,
+    AsyncIterator,
+    Type,
+    Literal,
+    Iterable,
+    TypeVar,
+)
+from csv import Dialect, excel
+from aiocsv import AsyncDictReader, AsyncDictWriter
+
+from pathlib import Path
 from typing import Any, Self
 from pydantic import ConfigDict
+
+import aiofiles
 
 from datetime import date, datetime
 from enum import Enum
 
-from result import Result, Ok, Err
-
 from .jsonexportable import JSONExportable
+from .utils import str2path
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -55,19 +69,10 @@ class CSVExportable(JSONExportable):
     #     cls._csv_writers.update(cls._csv_custom_writers)
     #     cls._csv_readers.update(cls._csv_custom_readers)
 
-    def csv_headers(
-        self, by_alias: bool = False, sep: str = "."
-    ) -> Result[list[str], str]:
+    def csv_headers(self, by_alias: bool = False, sep: str = ".") -> list[str]:
         """Provide CSV headers as list"""
-        try:
-            return Ok(
-                # list(self.model_dump(exclude_unset=False, by_alias=by_alias).keys())
-                list(
-                    self.flatten(sep=sep, by_alias=by_alias).keys()
-                )  # should this be sorted to maintain column order?
-            )
-        except Exception as e:
-            return Err(str(e))
+        # should this be sorted to maintain column order?
+        return list(self.flatten(sep=sep, by_alias=by_alias).keys())
 
     # def _csv_write_fields(
     #     self, left: dict[str, Any]
@@ -93,29 +98,26 @@ class CSVExportable(JSONExportable):
     #     # debug("Class: %s: left: %s", type(self), str(left))
     #     return res, left
 
-    def csv_row(self) -> Result[dict[str, str], str]:
+    def csv_row(self) -> dict[str, str]:
         """
         CSVExportable._csv_row() takes care of str,int,float,bool,Enum, date and datetime.
         Class specific implementation needs to take care or serializing other fields.
         Custom fields are serialized using __str__() method, so make sure to implement it for custom fields in CSVExportable.
         """
         res: dict[str, Any] = dict()
-        try:
-            flattened: dict[str, Any] = self.flatten()
-            for key, value in flattened.items():
-                if isinstance(value, Enum):
-                    res[key] = value.name
-                elif isinstance(value, date):
-                    res[key] = value.isoformat()
-                elif isinstance(value, datetime):
-                    res[key] = value.isoformat()
-                elif value is not None:
-                    res[key] = str(value)
-                else:
-                    res[key] = ""
-            return Ok(res)
-        except Exception as err:
-            return Err(str(err))
+        flattened: dict[str, Any] = self.flatten()
+        for key, value in flattened.items():
+            if isinstance(value, Enum):
+                res[key] = value.value
+            elif isinstance(value, date):
+                res[key] = value.isoformat()
+            elif isinstance(value, datetime):
+                res[key] = value.isoformat()
+            elif value is not None:
+                res[key] = str(value)
+            else:
+                res[key] = ""
+        return res
 
     # def _clear_None(
     #     self, res: dict[str, str | int | float | bool | None]
@@ -155,8 +157,8 @@ class CSVExportable(JSONExportable):
 
     @classmethod
     def from_csv(
-        cls, row: dict[str, Any], by_alias: bool = False, sep: str = ","
-    ) -> Result[Self, str]:
+        cls, row: dict[str, Any], by_alias: bool = False, sep: str = "."
+    ) -> Self:
         """
         Create an instance of the class from a CSV row. Does not work with alias field names.
 
@@ -164,10 +166,33 @@ class CSVExportable(JSONExportable):
         """
         try:
             if not isinstance(row, dict):
-                return Err("row has to be type dict()")
-            return Ok(cls.from_flattened(row, sep=sep, by_alias=by_alias))
+                raise TypeError("row has to be type 'dict'")
+            keys: list[str] = list(row.keys())
+            for key in keys:
+                if row[key] == "":
+                    row[key] = None
+            return cls.from_flattened(row, sep=sep, by_alias=by_alias, from_str=True)
         except Exception as err:
-            return Err(str(err))
+            raise err
+
+    @classmethod
+    async def import_csv(
+        cls,
+        filename: Path | str,
+        dialect: type[Dialect] = excel,
+        by_alias: bool = False,
+        sep: str = ".",
+    ) -> AsyncGenerator[Self, None]:
+        """
+        Import from filename, one model per line.
+        """
+        debug("importing from CSV file: %s", str(filename))
+        async with aiofiles.open(filename, mode="r", newline="") as f:
+            async for row in AsyncDictReader(f, dialect=dialect):
+                try:
+                    yield cls.from_csv(row, by_alias=by_alias, sep=sep)
+                except Exception as err:
+                    error("Could read line: %s", err)
 
         # res: dict[str, Any]
         # # debug("from_csv(): trying to import from: %s", str(row))
@@ -206,3 +231,136 @@ class CSVExportable(JSONExportable):
         # except ValidationError as err:
         #     error(f"Could not parse row ({row}): {err}")
         # return None
+
+
+##########################################################
+#
+# CSV functions
+#
+##########################################################
+
+
+# async def write_csv(
+#     filename: Path | str,
+#     items: Iterable[CSVExportable],
+#     force: bool = False,
+#     append: bool = False,
+# ) -> tuple[int, int]:
+#     exported: int = 0
+#     errors: int = 0
+#     try:
+#         filename = str2path(filename, ".csv")
+#         if filename.is_file() and (not (force or append)):
+#             raise FileExistsError(f"Cannot export to {filename}")
+#         mode: Literal["w", "a"] = "a" if append else "w"
+
+#         debug("opening %s for writing in mode=%s", str(filename), mode)
+#         async with aiofiles.open(filename, mode=mode, newline="") as csvfile:
+#             try:
+#                 header = items.
+#                 writer = AsyncDictWriter(
+#                     csvfile, fieldnames=fields, dialect=dialect
+#                 )
+#                 if not append:
+#                     await writer.writeheader()
+#             except Exception as err:
+#                 error(err)
+#                 raise
+
+#             while exportable is not None:
+#                 try:
+#                     # debug(f'Writing row: {exportable.csv_row()}')
+#                     await writer.writerow(exportable.csv_row())
+#                     exported += 1
+#                 except Exception as err:
+#                     error(f"error writing CSV row type={type(exportable)}: {err}")
+#                     errors += 1
+#                 exportable = await anext(aiterator, None)
+
+#     except OSError as err:
+#         error(f"could not write to {filename}: {err}")
+#         raise
+
+#     return exported, errors
+
+
+async def export_csv(
+    filename: Path | str,
+    iterable: AsyncIterable[CSVExportable] | Iterable[CSVExportable],
+    force: bool = False,
+    append: bool = False,
+) -> tuple[int, int]:
+    """
+    Export data to a CSVfile
+    If filename is "-", write to STDOUT."
+    Returns a tuple of (rows exported, errors)
+    """
+    T = TypeVar("T")
+
+    async def async_iter(iterable: Iterable[T]) -> AsyncIterable[T]:
+        for item in iterable:
+            yield item
+
+    debug("starting")
+    # assert isinstance(Q, Queue), "Q has to be type of asyncio.Queue[CSVExportable]"
+    # assert type(filename) is str and len(filename) > 0, "filename has to be str"
+    exported: int = 0
+    errors: int = 0
+    dialect: Type[Dialect] = excel
+    if isinstance(iterable, Iterable):
+        iterable = async_iter(iterable)
+    aiterator: AsyncIterator[CSVExportable] = aiter(iterable)
+    exportable: CSVExportable | None = await anext(aiterator, None)
+
+    if exportable is None:
+        raise ValueError("empty iterable given")
+    fields: list[str] = exportable.csv_headers()
+
+    if isinstance(filename, str) and filename == "-":  # STDOUT
+        # print header
+        print(dialect.delimiter.join(fields))
+        while exportable is not None:
+            try:
+                row: dict[str, str] = exportable.csv_row()
+                print(dialect.delimiter.join([row[key] for key in fields]))
+                exported += 1
+            except KeyError as err:
+                error(f"row does not have field: {err}")
+                errors += 1
+            exportable = await anext(aiterator, None)
+        debug("export finished")
+
+    else:  # File
+        try:
+            filename = str2path(filename, ".csv")
+            if filename.is_file() and (not (force or append)):
+                raise FileExistsError(f"Cannot export to {filename}")
+            mode: Literal["w", "a"] = "a" if append else "w"
+
+            debug("opening %s for writing in mode=%s", str(filename), mode)
+            async with aiofiles.open(filename, mode=mode, newline="") as csvfile:
+                try:
+                    writer = AsyncDictWriter(
+                        csvfile, fieldnames=fields, dialect=dialect
+                    )
+                    if not append:
+                        await writer.writeheader()
+                except Exception as err:
+                    error(err)
+                    raise
+
+                while exportable is not None:
+                    try:
+                        # debug(f'Writing row: {exportable.csv_row()}')
+                        await writer.writerow(exportable.csv_row())
+                        exported += 1
+                    except Exception as err:
+                        error(f"error writing CSV row type={type(exportable)}: {err}")
+                        errors += 1
+                    exportable = await anext(aiterator, None)
+
+        except OSError as err:
+            error(f"could not write to {filename}: {err}")
+            raise
+
+    return exported, errors
