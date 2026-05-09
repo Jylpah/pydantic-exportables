@@ -82,9 +82,7 @@ def csv_persons() -> List[CSVPerson]:
 
 
 @pytest.mark.asyncio
-async def test_csvexportable_export_import(
-    tmp_path: Path, csv_persons: List[CSVPerson]
-) -> None:
+async def test_export_import(tmp_path: Path, csv_persons: List[CSVPerson]) -> None:
     filename = tmp_path / "people.csv"
 
     await export_csv(filename=filename, iterable=csv_persons, force=True)
@@ -101,7 +99,7 @@ async def test_csvexportable_export_import(
 
 
 @pytest.mark.asyncio
-async def test_export_csv_writes_to_stdout_for_dash_filename(
+async def test_export_csv_to_stdout(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.chdir(tmp_path)
@@ -111,15 +109,15 @@ async def test_export_csv_writes_to_stdout_for_dash_filename(
 
     assert (exported, errors) == (2, 0)
     assert capsys.readouterr().out == (
-        "name,bday,gender,height,weight\n"
-        "Ada,,,,\n"
-        "Bob,,,,\n"
+        "name,bday,gender,height,weight\nAda,,,,\nBob,,,,\n"
     )
-    assert not (tmp_path / "-").exists()
+    assert not (tmp_path / "-").exists(), (
+        "export_csv() created '-' file instead of exporting to STDOUT"
+    )
 
 
 @pytest.mark.asyncio
-async def test_utils_import_csv_wrapper(tmp_path: Path) -> None:
+async def test_import_csv(tmp_path: Path) -> None:
     filename = tmp_path / "people.csv"
     filename.write_text("name,age,child.name\nAda,37,Eve\n", encoding="utf-8")
 
