@@ -13,7 +13,8 @@ from .jsonexportable import (
 
 from .utils import (
     str2path as str2path,
-    awrap as awrap,
+    awrap_gen as awrap_gen,
+    awrap_iter as awrap_iter,
     epoch_now as epoch_now,
 )
 

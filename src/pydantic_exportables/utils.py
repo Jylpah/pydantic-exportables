@@ -1,17 +1,12 @@
-from typing import TypeVar, Optional, Iterable, AsyncGenerator, Type
+from typing import TypeVar, Optional, Iterable, AsyncIterable, AsyncGenerator
 from pathlib import Path
 from time import time
-from csv import Dialect, excel
 from asyncio import sleep, CancelledError
 
 from aiohttp import ClientSession, ClientError
 from pydantic import BaseModel
-from aiocsv.readers import AsyncDictReader
-from result import Result, Ok, Err, is_Ok
-
 from multilevellogger import getMultiLevelLogger, MultiLevelLogger
-
-from pydantic_exportables import CSVExportable
+from result import Result, Ok, Err
 
 # Setup logging
 logger: MultiLevelLogger = getMultiLevelLogger(__name__)
@@ -25,7 +20,6 @@ MAX_RETRIES: int = 3
 SLEEP: float = 1
 
 M = TypeVar("M", bound=BaseModel)
-C = TypeVar("C", bound=CSVExportable)
 T = TypeVar("T")
 
 ##############################################
@@ -35,13 +29,21 @@ T = TypeVar("T")
 ##############################################
 
 
-async def awrap(iterable: Iterable[T]) -> AsyncGenerator[T, None]:
-    """awrap() is a async wrapper for Iterables
-
-    It converts an Iterable[T] to AsyncGenerator[T].
-    AsyncGenerator[T] is also AsyncIterable[T] allowing it to be used in async for
+async def awrap_gen(iterable: Iterable[T]) -> AsyncGenerator[T, None]:
+    """
+    awrap_gen() is a async wrapper that returns an AsyncGenerator[T] of a Iterable[T] 
+    so that the Iterable[T] can be used in async for loop.
     """
     for item in iter(iterable):
+        yield item
+
+
+async def awrap_iter(iterable: Iterable[T]) -> AsyncIterable[T]:
+    """
+    awrap_iter() is a async wrapper that returns an AsyncIterator[T] of a Iterable[T] 
+    so that the Iterable[T] can be used in async for loop.
+    """
+    for item in iterable:
         yield item
 
 
@@ -182,26 +184,13 @@ async def get_model_res(
 ###################################################
 
 
-@classmethod
-async def import_csv(
-    csv_model: Type[CSVExportable], filename: Path | str, dialect: Type[Dialect] = excel
-) -> AsyncGenerator[CSVExportable, int]:
-    """
-    Import from filename, one model per line
-    """
-    try:
-        lines: int = 0
-        debug("importing from CSV file: %s", str(filename))
-        async with open(filename, mode="r", newline="") as f:
-            async for row in AsyncDictReader(f, dialect=dialect):
-                # debug ("row: %s", row)
-                if is_Ok(importable := csv_model.from_csv(row)):
-                    # debug(f'{importable}')
-                    yield importable.ok_value
-                    lines += 1
-                else:
-                    error(f"Could read line: {importable.err_value}")
-
-    except Exception as err:
-        error(f"Error importing file {filename}: {err}")
-    return lines
+# async def import_csv(
+#     csv_model: type[CSVExportable],
+#     filename: Path | str,
+#     dialect: type[Dialect] = excel,
+# ) -> AsyncGenerator[CSVExportable, None]:
+#     """
+#     Compatibility wrapper for CSVExportable.import_csv().
+#     """
+#     async for row in csv_model.import_csv(filename=filename, dialect=dialect):
+#         yield row
